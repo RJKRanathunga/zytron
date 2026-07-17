@@ -15,7 +15,7 @@ export function SettingsPage() {
         <div>
           <span className="eyebrow">Settings</span>
           <h1>Set collector preferences for routing and alerts.</h1>
-          <p>These frontend settings persist for this mock workspace and can map to user preferences later.</p>
+          <p>These UI preferences stay local while supply, routes and pickups sync with the Flask API.</p>
         </div>
       </section>
 
@@ -90,6 +90,9 @@ export function SettingsPage() {
             </label>
             <button className="btn primary" type="submit">
               Save settings
+            </button>
+            <button className="btn secondary" type="button" onClick={app.logout}>
+              Log out
             </button>
           </form>
         </article>

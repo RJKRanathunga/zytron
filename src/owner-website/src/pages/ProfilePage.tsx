@@ -29,7 +29,7 @@ export function ProfilePage() {
           className="form-grid"
           onSubmit={(event) => {
             event.preventDefault()
-            app.showToast({ title: 'Profile saved', detail: `${name} details were updated for the owner workspace.` })
+            app.updateProfile({ phone })
           }}
         >
           <label className="field">

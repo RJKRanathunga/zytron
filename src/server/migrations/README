@@ -1,0 +1,8 @@
+Flask-Migrate/Alembic migrations for the PolyLoop Flask API.
+
+Run from src/server:
+
+    flask db upgrade
+
+The initial migration creates the SQLAlchemy model metadata so local SQLite and
+PostgreSQL development databases stay aligned with the application models.

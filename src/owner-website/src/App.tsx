@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { OwnerModals } from './components/modals/OwnerModals'
@@ -27,6 +27,7 @@ import type {
   MaterialFilter,
   MessageThread,
   Notification,
+  OwnerSnapshot,
   OwnerSortMode,
   OwnerUser,
   Pickup,
@@ -38,8 +39,92 @@ import type {
 import { formatKg, getReadyCompartments } from './utils/format'
 import './styles/app.css'
 
+type AuthMode = 'login' | 'register'
+
+interface AuthScreenProps {
+  initialError: string
+  onAuthenticated: (snapshot: OwnerSnapshot) => void
+}
+
+function OwnerAuthScreen({ initialError, onAuthenticated }: AuthScreenProps) {
+  const [mode, setMode] = useState<AuthMode>('login')
+  const [email, setEmail] = useState('owner@polyloop.demo')
+  const [password, setPassword] = useState('PolyLoop123!')
+  const [firstName, setFirstName] = useState('New')
+  const [lastName, setLastName] = useState('Owner')
+  const [organizationName, setOrganizationName] = useState('Community Collection Point')
+  const [error, setError] = useState(initialError)
+  const [isSubmitting, setSubmitting] = useState(false)
+
+  const submit = async (operation: () => Promise<OwnerSnapshot>) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      onAuthenticated(await operation())
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Authentication failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="loading-screen">
+      <span className="brand-mark">PL</span>
+      <h1>{mode === 'login' ? 'Owner sign in' : 'Create owner account'}</h1>
+      <p>Use the seeded owner demo account or register a new dustbin-owner profile.</p>
+      <form
+        className="form-grid single"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submit(() =>
+            mode === 'login'
+              ? ownerService.login(email, password)
+              : ownerService.register({ email, password, firstName, lastName, organizationName }),
+          )
+        }}
+      >
+        {mode === 'register' ? (
+          <>
+            <label className="field">
+              <span>First name</span>
+              <input required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>Last name</span>
+              <input required value={lastName} onChange={(event) => setLastName(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>Organization</span>
+              <input required value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} />
+            </label>
+          </>
+        ) : null}
+        <label className="field">
+          <span>Email</span>
+          <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        {error ? <p className="form-error">{error}</p> : null}
+        <button className="btn primary full-span" disabled={isSubmitting} type="submit">
+          {isSubmitting ? 'Signing in...' : mode === 'login' ? 'Sign in' : 'Register'}
+        </button>
+        <button className="btn secondary full-span" disabled={isSubmitting} type="button" onClick={() => void submit(ownerService.loginDemo)}>
+          Use owner demo
+        </button>
+        <button className="text-btn full-span" type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          {mode === 'login' ? 'Register as owner' : 'I already have an account'}
+        </button>
+      </form>
+    </main>
+  )
+}
+
 function App() {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => ownerService.hasSession())
   const [loadError, setLoadError] = useState('')
   const [user, setUser] = useState<OwnerUser | null>(null)
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([])
@@ -53,7 +138,7 @@ function App() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [messages, setMessages] = useState<MessageThread[]>([])
   const [activeMaterial, setActiveMaterial] = useLocalStorage<MaterialFilter>('owner-active-material', 'All')
-  const [selectedPointId, setSelectedPointId] = useLocalStorage('owner-selected-point', 'point-main')
+  const [selectedPointId, setSelectedPointId] = useLocalStorage('owner-selected-point', 'point-uom')
   const [sortMode, setSortMode] = useLocalStorage<OwnerSortMode>('owner-sort-mode', 'readiness')
   const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState<ToastMessage | null>(null)
@@ -62,35 +147,48 @@ function App() {
   const [isPublishOpen, setPublishOpen] = useState(false)
   const [scheduleOfferId, setScheduleOfferId] = useState<string | null>(null)
 
+  const applySnapshot = useCallback((snapshot: OwnerSnapshot) => {
+    setUser(snapshot.user)
+    setCollectionPoints(snapshot.collectionPoints)
+    setSmartBins(snapshot.smartBins)
+    setLots(snapshot.lots)
+    setOffers(snapshot.offers)
+    setPickups(snapshot.pickups)
+    setTransactions(snapshot.transactions)
+    setDeviceAlerts(snapshot.deviceAlerts)
+    setImpactMetrics(snapshot.impactMetrics)
+    setNotifications(snapshot.notifications)
+    setMessages(snapshot.messages)
+    if (!snapshot.collectionPoints.some((point) => point.id === selectedPointId)) {
+      setSelectedPointId(snapshot.collectionPoints[0]?.id ?? '')
+    }
+  }, [selectedPointId, setSelectedPointId])
+
   useEffect(() => {
     let isMounted = true
+    if (!ownerService.hasSession()) {
+      return () => {
+        isMounted = false
+      }
+    }
+
     ownerService
       .loadSnapshot()
       .then((snapshot) => {
         if (!isMounted) return
-        setUser(snapshot.user)
-        setCollectionPoints(snapshot.collectionPoints)
-        setSmartBins(snapshot.smartBins)
-        setLots(snapshot.lots)
-        setOffers(snapshot.offers)
-        setPickups(snapshot.pickups)
-        setTransactions(snapshot.transactions)
-        setDeviceAlerts(snapshot.deviceAlerts)
-        setImpactMetrics(snapshot.impactMetrics)
-        setNotifications(snapshot.notifications)
-        setMessages(snapshot.messages)
+        applySnapshot(snapshot)
         setIsLoading(false)
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return
-        setLoadError('Owner data could not be loaded.')
+        setLoadError(error instanceof Error ? error.message : 'Owner data could not be loaded.')
         setIsLoading(false)
       })
 
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [applySnapshot])
 
   useEffect(() => {
     if (!toast) return
@@ -99,6 +197,18 @@ function App() {
   }, [toast])
 
   const showToast = (message: ToastMessage) => setToast(message)
+
+  const mutate = async (operation: () => Promise<OwnerSnapshot>, success: ToastMessage) => {
+    try {
+      applySnapshot(await operation())
+      showToast(success)
+    } catch (error) {
+      showToast({
+        title: 'Action failed',
+        detail: error instanceof Error ? error.message : 'The server could not complete the request.',
+      })
+    }
+  }
 
   const openPublishModal = (binId?: string) => {
     const fallbackBin = getReadyCompartments(smartBins)[0]?.bin
@@ -118,30 +228,17 @@ function App() {
     )
     if (!bin || !compartment || Number.isNaN(pricePerKg) || pricePerKg <= 0) return
 
-    const lot: PlasticLot = {
-      id: `lot-${bin.id}-${Date.now()}`,
-      material: compartment.material,
-      binId: bin.id,
-      quantityKg: compartment.quantityKg,
-      pricePerKg,
-      status: 'published',
-      pickupWindow,
-      publishedAt: 'Just now',
-      views: 0,
-    }
-    setLots([lot, ...lots])
+    void mutate(() => ownerService.publishLot(binId, pricePerKg, pickupWindow), {
+      title: 'Plastic lot published',
+      detail: `${formatKg(compartment.quantityKg)} ${compartment.material} is now visible to collectors.`,
+    })
     setPublishOpen(false)
     setPublishBinId(null)
-    showToast({
-      title: 'Plastic lot published',
-      detail: `${formatKg(lot.quantityKg)} ${lot.material} is now visible to collectors.`,
-    })
   }
 
   const withdrawLot = (lotId: string) => {
     const lot = lots.find((item) => item.id === lotId)
-    setLots(lots.map((item) => (item.id === lotId ? { ...item, status: 'withdrawn' } : item)))
-    showToast({
+    void mutate(() => ownerService.withdrawLot(lotId), {
       title: 'Lot withdrawn',
       detail: `${lot ? `${formatKg(lot.quantityKg)} ${lot.material}` : 'Selected lot'} is no longer visible.`,
     })
@@ -153,47 +250,17 @@ function App() {
 
   const acceptOffer = (offerId: string, pickupDate: string, timeWindow: string) => {
     const offer = offers.find((item) => item.id === offerId)
-    const lot = offer ? lots.find((item) => item.id === offer.lotId) : undefined
-    if (!offer || !lot) return
-
-    setOffers(offers.map((item) => (item.id === offerId ? { ...item, status: 'accepted' } : item)))
-    setLots(lots.map((item) => (item.id === lot.id ? { ...item, status: 'reserved' } : item)))
-    setPickups([
-      {
-        id: `pickup-${offer.id}-${Date.now()}`,
-        lotId: lot.id,
-        collectorName: offer.collectorName,
-        collectorInitials: offer.collectorInitials,
-        dateLabel: pickupDate,
-        timeWindow,
-        status: 'scheduled',
-        handoverCode: `UM-${offer.collectorInitials}-${Math.round(lot.quantityKg * 10)}`,
-        progressPercent: 10,
-      },
-      ...pickups,
-    ])
-    setTransactions([
-      {
-        id: `txn-${offer.id}-${Date.now()}`,
-        title: `${offer.collectorName} accepted offer`,
-        dateLabel: pickupDate,
-        amount: offer.price,
-        status: 'scheduled',
-        method: 'Wallet release after handover',
-      },
-      ...transactions,
-    ])
-    setScheduleOfferId(null)
-    showToast({
+    if (!offer) return
+    void mutate(() => ownerService.acceptOffer(offerId, pickupDate, timeWindow), {
       title: 'Offer accepted',
       detail: `${offer.collectorName} is scheduled for ${pickupDate}, ${timeWindow}.`,
     })
+    setScheduleOfferId(null)
   }
 
   const rejectOffer = (offerId: string) => {
     const offer = offers.find((item) => item.id === offerId)
-    setOffers(offers.map((item) => (item.id === offerId ? { ...item, status: 'rejected' } : item)))
-    showToast({
+    void mutate(() => ownerService.rejectOffer(offerId), {
       title: 'Offer rejected',
       detail: `${offer?.collectorName ?? 'The collector'} will see that this offer was declined.`,
     })
@@ -201,38 +268,48 @@ function App() {
 
   const updatePickupProgress = (pickupId: string) => {
     const pickup = pickups.find((item) => item.id === pickupId)
-    setPickups(
-      pickups.map((item) => {
-        if (item.id !== pickupId) return item
-        const nextProgress = Math.min(100, item.progressPercent + 25)
-        return {
-          ...item,
-          progressPercent: nextProgress,
-          status: nextProgress >= 100 ? 'completed' : 'in-progress',
-        }
-      }),
-    )
-    showToast({
+    void mutate(() => ownerService.updatePickupProgress(pickupId), {
       title: 'Pickup progress updated',
       detail: `${pickup?.collectorName ?? 'Collector'} progress has been refreshed.`,
     })
   }
 
   const sendMessage = (threadId: string, message: string) => {
-    setMessages(
-      messages.map((thread) =>
-        thread.id === threadId ? { ...thread, lastMessage: message, timeLabel: 'Just now', unread: 0 } : thread,
-      ),
-    )
-    showToast({ title: 'Message sent', detail: 'The owner conversation has been updated.' })
+    void mutate(() => ownerService.sendMessage(threadId, message), {
+      title: 'Message sent',
+      detail: 'The owner conversation has been updated.',
+    })
   }
 
   const markNotificationRead = (id: string) => {
     const notification = notifications.find((item) => item.id === id)
-    setNotifications(notifications.map((item) => (item.id === id ? { ...item, read: true } : item)))
-    showToast({
+    void mutate(() => ownerService.markNotificationRead(id), {
       title: notification?.title ?? 'Notification opened',
       detail: notification?.body ?? 'Notification marked as read.',
+    })
+  }
+
+  const updateProfile = (input: { phone: string }) => {
+    void mutate(() => ownerService.updateProfile(input), {
+      title: 'Profile saved',
+      detail: 'Your owner profile was updated in the API.',
+    })
+  }
+
+  const logout = () => {
+    void ownerService.logout().then(() => {
+      setUser(null)
+      setCollectionPoints([])
+      setSmartBins([])
+      setLots([])
+      setOffers([])
+      setPickups([])
+      setTransactions([])
+      setDeviceAlerts([])
+      setImpactMetrics([])
+      setNotifications([])
+      setMessages([])
+      setLoadError('')
     })
   }
 
@@ -241,22 +318,13 @@ function App() {
       <main className="loading-screen">
         <span className="brand-mark">PL</span>
         <h1>Loading owner workspace</h1>
-        <p>Preparing mock bins, offers and pickups.</p>
+        <p>Syncing bins, offers and pickups from the API.</p>
       </main>
     )
   }
 
-  if (loadError || !user) {
-    return (
-      <main className="loading-screen">
-        <span className="brand-mark">PL</span>
-        <h1>Owner workspace unavailable</h1>
-        <p>{loadError || 'The workspace user could not be loaded.'}</p>
-        <button className="btn primary" type="button" onClick={() => window.location.reload()}>
-          Reload
-        </button>
-      </main>
-    )
+  if (!user) {
+    return <OwnerAuthScreen initialError={loadError} onAuthenticated={applySnapshot} />
   }
 
   const context: OwnerAppContext = {
@@ -290,6 +358,8 @@ function App() {
     rejectOffer,
     updatePickupProgress,
     sendMessage,
+    updateProfile,
+    logout,
     showToast,
   }
 

@@ -15,7 +15,7 @@ export function SettingsPage() {
         <div>
           <span className="eyebrow">Point settings</span>
           <h1>Control publishing preferences, pickup windows and device alerts.</h1>
-          <p>These settings are stored locally for the mock UI and can become backend user preferences later.</p>
+          <p>These UI preferences stay local while bins, offers and pickups sync with the Flask API.</p>
         </div>
       </section>
       <section className="grid-main">
@@ -65,6 +65,9 @@ export function SettingsPage() {
             </label>
             <button className="btn primary" type="submit">
               Save settings
+            </button>
+            <button className="btn secondary" type="button" onClick={app.logout}>
+              Log out
             </button>
           </form>
         </article>

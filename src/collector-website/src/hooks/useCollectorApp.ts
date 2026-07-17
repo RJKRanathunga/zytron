@@ -43,6 +43,8 @@ export interface CollectorAppContext {
   toggleSavedPoint: (pointId: string) => void
   createDemandAlert: (alert: Omit<DemandAlert, 'id' | 'matches'>) => void
   sendMessage: (threadId: string, message: string) => void
+  updateProfile: (input: { phone: string; baseLocation: string; vehicleCapacityKg: number }) => void
+  logout: () => void
   showToast: (message: ToastMessage) => void
 }
 

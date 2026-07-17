@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { CollectorModals } from './components/modals/CollectorModals'
@@ -19,6 +19,7 @@ import { useLocalStorage } from './hooks/useLocalStorage'
 import type { CollectorAppContext } from './hooks/useCollectorApp'
 import type {
   CollectionPoint,
+  CollectorSnapshot,
   CollectorSortMode,
   DemandAlert,
   MaterialFilter,
@@ -30,11 +31,94 @@ import type {
   Transaction,
   User,
 } from './types/domain'
-import { formatCurrency, formatKg, getLotValue, getPointForLot } from './utils/format'
 import './styles/app.css'
 
+type AuthMode = 'login' | 'register'
+
+interface AuthScreenProps {
+  initialError: string
+  onAuthenticated: (snapshot: CollectorSnapshot) => void
+}
+
+function CollectorAuthScreen({ initialError, onAuthenticated }: AuthScreenProps) {
+  const [mode, setMode] = useState<AuthMode>('login')
+  const [email, setEmail] = useState('collector@polyloop.demo')
+  const [password, setPassword] = useState('PolyLoop123!')
+  const [firstName, setFirstName] = useState('New')
+  const [lastName, setLastName] = useState('Collector')
+  const [organizationName, setOrganizationName] = useState('Neighborhood Recyclers')
+  const [error, setError] = useState(initialError)
+  const [isSubmitting, setSubmitting] = useState(false)
+
+  const submit = async (operation: () => Promise<CollectorSnapshot>) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      onAuthenticated(await operation())
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Authentication failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="loading-screen">
+      <span className="brand-mark">PL</span>
+      <h1>{mode === 'login' ? 'Collector sign in' : 'Create collector account'}</h1>
+      <p>Use the seeded collector demo account or register a new collector profile.</p>
+      <form
+        className="form-grid single"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submit(() =>
+            mode === 'login'
+              ? collectorService.login(email, password)
+              : collectorService.register({ email, password, firstName, lastName, organizationName }),
+          )
+        }}
+      >
+        {mode === 'register' ? (
+          <>
+            <label className="field">
+              <span>First name</span>
+              <input required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>Last name</span>
+              <input required value={lastName} onChange={(event) => setLastName(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>Organization</span>
+              <input required value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} />
+            </label>
+          </>
+        ) : null}
+        <label className="field">
+          <span>Email</span>
+          <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        {error ? <p className="form-error">{error}</p> : null}
+        <button className="btn primary full-span" disabled={isSubmitting} type="submit">
+          {isSubmitting ? 'Signing in...' : mode === 'login' ? 'Sign in' : 'Register'}
+        </button>
+        <button className="btn secondary full-span" disabled={isSubmitting} type="button" onClick={() => void submit(collectorService.loginDemo)}>
+          Use collector demo
+        </button>
+        <button className="text-btn full-span" type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          {mode === 'login' ? 'Register as collector' : 'I already have an account'}
+        </button>
+      </form>
+    </main>
+  )
+}
+
 function App() {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => collectorService.hasSession())
   const [loadError, setLoadError] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [lots, setLots] = useState<PlasticLot[]>([])
@@ -46,48 +130,52 @@ function App() {
   const [messages, setMessages] = useState<MessageThread[]>([])
   const [activeMaterial, setActiveMaterial] = useLocalStorage<MaterialFilter>('collector-active-material', 'All')
   const [sortMode, setSortMode] = useLocalStorage<CollectorSortMode>('collector-sort-mode', 'recommended')
-  const [routeLotIds, setRouteLotIds] = useLocalStorage<string[]>('collector-route-lot-ids', [
-    'lot-uom-pp',
-    'lot-kesbewa-pp',
-    'lot-piliyandala-pp',
-  ])
-  const [savedPointIds, setSavedPointIds] = useLocalStorage<string[]>('collector-saved-point-ids', [
-    'point-uom',
-    'point-katubedda',
-    'point-kesbewa',
-  ])
+  const [routeLotIds, setRouteLotIds] = useState<string[]>([])
+  const [savedPointIds, setSavedPointIds] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [reserveLotId, setReserveLotId] = useState<string | null>(null)
   const [isRouteModalOpen, setRouteModalOpen] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const [isNotificationsOpen, setNotificationsOpen] = useState(false)
 
+  const applySnapshot = useCallback((snapshot: CollectorSnapshot) => {
+    setUser(snapshot.user)
+    setLots(snapshot.lots)
+    setPoints(snapshot.points)
+    setPickups(snapshot.pickups)
+    setDemandAlerts(snapshot.demandAlerts)
+    setTransactions(snapshot.transactions)
+    setNotifications(snapshot.notifications)
+    setMessages(snapshot.messages)
+    setRouteLotIds(snapshot.routePlan.stops.map((stop) => stop.lotId))
+    setSavedPointIds(snapshot.points.filter((point) => point.saved).map((point) => point.id))
+  }, [])
+
   useEffect(() => {
     let isMounted = true
+    if (!collectorService.hasSession()) {
+      return () => {
+        isMounted = false
+      }
+    }
+
     collectorService
       .loadSnapshot()
       .then((snapshot) => {
         if (!isMounted) return
-        setUser(snapshot.user)
-        setLots(snapshot.lots)
-        setPoints(snapshot.points)
-        setPickups(snapshot.pickups)
-        setDemandAlerts(snapshot.demandAlerts)
-        setTransactions(snapshot.transactions)
-        setNotifications(snapshot.notifications)
-        setMessages(snapshot.messages)
+        applySnapshot(snapshot)
         setIsLoading(false)
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return
-        setLoadError('Collector data could not be loaded.')
+        setLoadError(error instanceof Error ? error.message : 'Collector data could not be loaded.')
         setIsLoading(false)
       })
 
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [applySnapshot])
 
   useEffect(() => {
     if (!toast) return
@@ -96,6 +184,18 @@ function App() {
   }, [toast])
 
   const showToast = (message: ToastMessage) => setToast(message)
+
+  const mutate = async (operation: () => Promise<CollectorSnapshot>, success: ToastMessage) => {
+    try {
+      applySnapshot(await operation())
+      showToast(success)
+    } catch (error) {
+      showToast({
+        title: 'Action failed',
+        detail: error instanceof Error ? error.message : 'The server could not complete the request.',
+      })
+    }
+  }
 
   const addLotToRoute = (lotId: string) => {
     const lot = lots.find((item) => item.id === lotId)
@@ -116,50 +216,25 @@ function App() {
 
   const confirmReservation = (lotId: string, date: string, timeWindow: string) => {
     const lot = lots.find((item) => item.id === lotId)
-    const point = lot ? getPointForLot(lot, points) : undefined
     if (!lot) return
-
-    const pickup: Pickup = {
-      id: `pickup-${lot.id}-${Date.now()}`,
-      lotId: lot.id,
-      pointName: point?.name ?? 'Collection point',
-      pointInitials: point?.initials ?? 'CP',
-      material: lot.material,
-      quantityKg: lot.quantityKg,
-      dateLabel: date,
-      timeWindow,
-      status: 'awaiting',
-      price: getLotValue(lot),
-      distanceKm: point?.distanceKm ?? 0,
-      qrCode: `${user?.initials ?? 'GN'}-${point?.initials ?? 'CP'}-${lot.material}-${Math.round(lot.quantityKg * 10)}`,
-    }
-
-    setPickups([pickup, ...pickups])
-    setLots(lots.map((item) => (item.id === lotId ? { ...item, status: 'reserved', readinessLabel: 'Reserved' } : item)))
-    setReserveLotId(null)
-    showToast({
+    void mutate(() => collectorService.reserveLot(lotId, date, timeWindow), {
       title: 'Reservation request sent',
-      detail: `${formatKg(lot.quantityKg)} ${lot.material} is awaiting owner confirmation.`,
+      detail: `${lot.title} is awaiting owner confirmation.`,
     })
+    setReserveLotId(null)
   }
 
   const saveRoute = (date: string) => {
-    const routeLots = routeLotIds
-      .map((lotId) => lots.find((lot) => lot.id === lotId))
-      .filter((lot): lot is PlasticLot => Boolean(lot))
-    setRouteModalOpen(false)
-    showToast({
+    void mutate(() => collectorService.saveRoute(routeLotIds, date), {
       title: 'Route saved',
-      detail: `${routeLots.length} stops saved for ${date} with ${formatCurrency(
-        routeLots.reduce((total, lot) => total + getLotValue(lot), 0),
-      )} planned spend.`,
+      detail: `${routeLotIds.length} stops were saved for ${date}.`,
     })
+    setRouteModalOpen(false)
   }
 
   const cancelPickup = (pickupId: string) => {
     const pickup = pickups.find((item) => item.id === pickupId)
-    setPickups(pickups.map((item) => (item.id === pickupId ? { ...item, status: 'cancelled' } : item)))
-    showToast({
+    void mutate(() => collectorService.cancelPickup(pickupId), {
       title: 'Pickup cancelled',
       detail: `${pickup?.pointName ?? 'The owner'} will see the updated reservation status.`,
     })
@@ -168,47 +243,54 @@ function App() {
   const toggleSavedPoint = (pointId: string) => {
     const point = points.find((item) => item.id === pointId)
     const isSaved = savedPointIds.includes(pointId)
-    setSavedPointIds(isSaved ? savedPointIds.filter((item) => item !== pointId) : [...savedPointIds, pointId])
-    showToast({
+    void mutate(() => collectorService.toggleSavedPoint(pointId), {
       title: isSaved ? 'Collection point removed' : 'Collection point saved',
       detail: `${point?.name ?? 'Selected point'} ${isSaved ? 'left' : 'joined'} your saved partner list.`,
     })
   }
 
   const createDemandAlert = (alert: Omit<DemandAlert, 'id' | 'matches'>) => {
-    const matches = lots.filter((lot) => {
-      const point = getPointForLot(lot, points)
-      const materialMatch = alert.material === 'All' || lot.material === alert.material
-      const priceMatch = alert.maxPricePerKg ? lot.pricePerKg <= alert.maxPricePerKg : true
-      return materialMatch && lot.quantityKg >= alert.minimumKg && priceMatch && (point?.distanceKm ?? 99) <= alert.radiusKm
-    }).length
-    const nextAlert: DemandAlert = {
-      ...alert,
-      id: `alert-${Date.now()}`,
-      matches,
-    }
-    setDemandAlerts([nextAlert, ...demandAlerts])
-    showToast({
+    void mutate(() => collectorService.createDemandAlert(alert), {
       title: 'Demand alert created',
-      detail: `${nextAlert.label} is watching ${matches} matching lots.`,
+      detail: `${alert.label} is watching for matching lots.`,
     })
   }
 
   const sendMessage = (threadId: string, message: string) => {
-    setMessages(
-      messages.map((thread) =>
-        thread.id === threadId ? { ...thread, lastMessage: message, timeLabel: 'Just now', unread: 0 } : thread,
-      ),
-    )
-    showToast({ title: 'Message sent', detail: 'The pickup conversation has been updated.' })
+    void mutate(() => collectorService.sendMessage(threadId, message), {
+      title: 'Message sent',
+      detail: 'The pickup conversation has been updated.',
+    })
   }
 
   const markNotificationRead = (id: string) => {
     const notification = notifications.find((item) => item.id === id)
-    setNotifications(notifications.map((item) => (item.id === id ? { ...item, read: true } : item)))
-    showToast({
+    void mutate(() => collectorService.markNotificationRead(id), {
       title: notification?.title ?? 'Notification opened',
       detail: notification?.body ?? 'Notification marked as read.',
+    })
+  }
+
+  const updateProfile = (input: { phone: string; baseLocation: string; vehicleCapacityKg: number }) => {
+    void mutate(() => collectorService.updateProfile(input), {
+      title: 'Profile details saved',
+      detail: 'Your collector profile was updated in the API.',
+    })
+  }
+
+  const logout = () => {
+    void collectorService.logout().then(() => {
+      setUser(null)
+      setLots([])
+      setPoints([])
+      setPickups([])
+      setDemandAlerts([])
+      setTransactions([])
+      setNotifications([])
+      setMessages([])
+      setRouteLotIds([])
+      setSavedPointIds([])
+      setLoadError('')
     })
   }
 
@@ -217,22 +299,13 @@ function App() {
       <main className="loading-screen">
         <span className="brand-mark">PL</span>
         <h1>Loading collector workspace</h1>
-        <p>Preparing mock supply, routes and reservations.</p>
+        <p>Syncing supply, routes and reservations from the API.</p>
       </main>
     )
   }
 
-  if (loadError || !user) {
-    return (
-      <main className="loading-screen">
-        <span className="brand-mark">PL</span>
-        <h1>Collector workspace unavailable</h1>
-        <p>{loadError || 'The workspace user could not be loaded.'}</p>
-        <button className="btn primary" type="button" onClick={() => window.location.reload()}>
-          Reload
-        </button>
-      </main>
-    )
+  if (!user) {
+    return <CollectorAuthScreen initialError={loadError} onAuthenticated={applySnapshot} />
   }
 
   const context: CollectorAppContext = {
@@ -265,6 +338,8 @@ function App() {
     toggleSavedPoint,
     createDemandAlert,
     sendMessage,
+    updateProfile,
+    logout,
     showToast,
   }
 

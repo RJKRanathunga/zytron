@@ -38,9 +38,10 @@ export function ProfilePage() {
           className="form-grid"
           onSubmit={(event) => {
             event.preventDefault()
-            app.showToast({
-              title: 'Profile details saved',
-              detail: `${name} will be shown on future reservation requests.`,
+            app.updateProfile({
+              phone,
+              baseLocation,
+              vehicleCapacityKg: Number(capacity),
             })
           }}
         >

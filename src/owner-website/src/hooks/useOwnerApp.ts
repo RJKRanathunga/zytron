@@ -47,6 +47,8 @@ export interface OwnerAppContext {
   rejectOffer: (offerId: string) => void
   updatePickupProgress: (pickupId: string) => void
   sendMessage: (threadId: string, message: string) => void
+  updateProfile: (input: { phone: string }) => void
+  logout: () => void
   showToast: (message: ToastMessage) => void
 }
 
