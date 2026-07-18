@@ -324,8 +324,8 @@ def bin_for_owner(smart_bin: SmartBin) -> dict:
         "label": smart_bin.name,
         "deviceCode": smart_bin.device_code,
         "model": smart_bin.model or "",
-        "location": smart_bin.location_label or smart_bin.collection_point.name,
-        "collectionPointId": smart_bin.collection_point_id,
+        "location": smart_bin.location_label or (smart_bin.collection_point.name if smart_bin.collection_point else ""),
+        "collectionPointId": smart_bin.collection_point_id or "",
         "status": status,
         "batteryPercent": smart_bin.battery_percent,
         "lastSync": "Now" if smart_bin.last_seen_at else "Never",
@@ -538,8 +538,7 @@ def collector_snapshot(user: User) -> dict:
 
 def owner_snapshot(user: User) -> dict:
     points = CollectionPoint.query.filter_by(owner_id=user.id, is_active=True).all()
-    point_ids = [point.id for point in points]
-    bins = SmartBin.query.filter(SmartBin.collection_point_id.in_(point_ids)).all() if point_ids else []
+    bins = SmartBin.query.filter_by(owner_id=user.id).all()
     lots = PlasticLot.query.filter_by(owner_id=user.id).order_by(PlasticLot.created_at.desc()).all()
     offers = CollectorOffer.query.join(PlasticLot).filter(PlasticLot.owner_id == user.id).order_by(CollectorOffer.created_at.desc()).all()
     pickups = Pickup.query.filter_by(owner_id=user.id).order_by(Pickup.created_at.desc()).all()

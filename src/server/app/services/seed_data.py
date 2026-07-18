@@ -280,6 +280,7 @@ def seed_database():
         upsert(
             SmartBin,
             bin_id,
+            owner_id=owner.id,
             collection_point_id=point_id,
             device_code=device_code,
             device_secret=generate_password_hash(f"{device_code}-device-secret"),

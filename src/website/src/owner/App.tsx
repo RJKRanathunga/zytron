@@ -152,7 +152,6 @@ function App() {
   }
 
   const createSmartBin = (input: {
-    collectionPointId: string
     label: string
     deviceCode: string
     location: string
@@ -169,7 +168,6 @@ function App() {
   const updateSmartBin = (
     binId: string,
     input: {
-      collectionPointId: string
       label: string
       deviceCode: string
       location: string

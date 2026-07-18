@@ -44,7 +44,6 @@ export interface LotUpdateInput {
 }
 
 export interface SmartBinInput {
-  collectionPointId: string
   label: string
   deviceCode: string
   location: string
@@ -55,6 +54,17 @@ export interface SmartBinInput {
 
 async function reloadSnapshot(): Promise<OwnerSnapshot> {
   return apiRequest<OwnerSnapshot>('/dashboard/owner')
+}
+
+function smartBinPayload(input: SmartBinInput) {
+  return {
+    label: input.label,
+    deviceCode: input.deviceCode,
+    location: input.location,
+    model: input.model,
+    status: input.status,
+    supportedMaterials: input.supportedMaterials,
+  }
 }
 
 export const ownerService: OwnerService = {
@@ -87,7 +97,7 @@ export const ownerService: OwnerService = {
   createSmartBin: async (input) => {
     await apiRequest('/bins', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(smartBinPayload(input)),
     })
     return reloadSnapshot()
   },
@@ -95,7 +105,7 @@ export const ownerService: OwnerService = {
   updateSmartBin: async (binId, input) => {
     await apiRequest(`/bins/${binId}`, {
       method: 'PATCH',
-      body: JSON.stringify(input),
+      body: JSON.stringify(smartBinPayload(input)),
     })
     return reloadSnapshot()
   },

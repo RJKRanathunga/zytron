@@ -7,8 +7,7 @@ import { MATERIAL_FILTER_OPTIONS, PLASTIC_MATERIAL_CODES, plasticMaterialLabel }
 
 const materialOptions = MATERIAL_FILTER_OPTIONS satisfies readonly MaterialFilter[]
 
-const defaultForm = (collectionPointId: string): SmartBinFormInput => ({
-  collectionPointId,
+const defaultForm = (): SmartBinFormInput => ({
   label: '',
   deviceCode: '',
   location: '',
@@ -18,7 +17,6 @@ const defaultForm = (collectionPointId: string): SmartBinFormInput => ({
 })
 
 const formFromBin = (bin: SmartBin): SmartBinFormInput => ({
-  collectionPointId: bin.collectionPointId,
   label: bin.label,
   deviceCode: bin.deviceCode,
   location: bin.location,
@@ -30,9 +28,10 @@ const formFromBin = (bin: SmartBin): SmartBinFormInput => ({
 export function BinsPage() {
   const app = useOwnerApp()
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<SmartBinFormInput>(() => defaultForm(app.selectedPointId || app.collectionPoints[0]?.id || ''))
+  const [form, setForm] = useState<SmartBinFormInput>(() => defaultForm())
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+
   const bins = useMemo(() => {
     const normalizedQuery = app.searchQuery.trim().toLowerCase()
     return app.smartBins.filter((bin) => {
@@ -45,7 +44,7 @@ export function BinsPage() {
 
   const openNew = () => {
     setEditingId('')
-    setForm(defaultForm(app.selectedPointId || app.collectionPoints[0]?.id || ''))
+    setForm(defaultForm())
     setFormError('')
   }
 
@@ -68,7 +67,6 @@ export function BinsPage() {
   }
 
   const validate = () => {
-    if (!form.collectionPointId) return 'Choose a collection point.'
     if (form.label.trim().length < 2) return 'Enter a smart bin label.'
     if (form.deviceCode.trim().length < 2) return 'Enter a smart bin code.'
     if (form.location.trim().length < 2) return 'Enter a location label.'
@@ -136,16 +134,6 @@ export function BinsPage() {
               void submit()
             }}
           >
-            <label className="field">
-              <span>Collection point</span>
-              <select value={form.collectionPointId} onChange={(event) => setForm({ ...form, collectionPointId: event.target.value })}>
-                {app.collectionPoints.map((point) => (
-                  <option key={point.id} value={point.id}>
-                    {point.name}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label className="field">
               <span>Smart bin label</span>
               <input required value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />

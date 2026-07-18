@@ -100,7 +100,8 @@ CREATE TABLE IF NOT EXISTS collection_points (
 
 CREATE TABLE IF NOT EXISTS smart_bins (
   id VARCHAR(64) PRIMARY KEY,
-  collection_point_id VARCHAR(64) NOT NULL REFERENCES collection_points(id),
+  owner_id VARCHAR(64) NOT NULL REFERENCES users(id),
+  collection_point_id VARCHAR(64) REFERENCES collection_points(id),
   device_code VARCHAR(80) NOT NULL UNIQUE,
   device_secret VARCHAR(255),
   name VARCHAR(120) NOT NULL,
@@ -479,6 +480,7 @@ CREATE INDEX IF NOT EXISTS ix_collection_points_district ON collection_points (d
 CREATE INDEX IF NOT EXISTS ix_collection_points_organization_id ON collection_points (organization_id);
 CREATE INDEX IF NOT EXISTS ix_collection_points_owner_id ON collection_points (owner_id);
 CREATE INDEX IF NOT EXISTS ix_smart_bins_collection_point_id ON smart_bins (collection_point_id);
+CREATE INDEX IF NOT EXISTS ix_smart_bins_owner_id ON smart_bins (owner_id);
 CREATE INDEX IF NOT EXISTS ix_smart_bins_status ON smart_bins (status);
 CREATE INDEX IF NOT EXISTS ix_bin_compartments_material_id ON bin_compartments (material_id);
 CREATE INDEX IF NOT EXISTS ix_bin_compartments_smart_bin_id ON bin_compartments (smart_bin_id);

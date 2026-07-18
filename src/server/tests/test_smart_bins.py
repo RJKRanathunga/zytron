@@ -11,7 +11,6 @@ def test_owner_can_add_list_view_and_edit_smart_bin(client, owner_token, auth_he
         "/api/v1/bins",
         headers=auth_header(owner_token),
         json={
-            "collectionPointId": "point-uom",
             "label": "Library Smart Bin",
             "deviceCode": "LIB-SB-001",
             "location": "Library lobby",
@@ -97,6 +96,7 @@ def test_smart_bin_owner_authorization(client, owner_token, collector_token, aut
         )
         smart_bin = SmartBin(
             id="bin-other-owner",
+            owner=owner,
             collection_point=point,
             device_code="OTHER-SB-001",
             name="Other Smart Bin",
@@ -123,7 +123,6 @@ def test_smart_bin_owner_authorization(client, owner_token, collector_token, aut
         "/api/v1/bins",
         headers=auth_header(collector_token),
         json={
-            "collectionPointId": "point-uom",
             "label": "Collector Bin",
             "deviceCode": "COLLECTOR-SB-001",
             "location": "Collector location",
@@ -151,7 +150,6 @@ def test_publish_lot_from_smart_bin_uses_manual_weights_and_links_bin(client, ow
         "/api/v1/bins",
         headers=auth_header(owner_token),
         json={
-            "collectionPointId": "point-uom",
             "label": "Manual Publish Smart Bin",
             "deviceCode": "MANUAL-SB-001",
             "location": "Materials counter",
@@ -198,7 +196,6 @@ def test_publish_lot_rejects_unsupported_bin_material_and_inactive_bin(client, o
         "/api/v1/bins",
         headers=auth_header(owner_token),
         json={
-            "collectionPointId": "point-uom",
             "label": "PET Only Smart Bin",
             "deviceCode": "PET-ONLY-SB-001",
             "location": "North gate",

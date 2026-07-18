@@ -228,6 +228,10 @@ def ensure_lot_owner(user: User, lot: PlasticLot):
         raise ResourceNotFound("The requested lot was not found.")
 
 
+def default_owner_collection_point(user: User) -> CollectionPoint | None:
+    return CollectionPoint.query.filter_by(owner_id=user.id, is_active=True).order_by(CollectionPoint.created_at.asc()).first()
+
+
 def ensure_pickup_participant(user: User, pickup: Pickup):
     if user.id not in {pickup.owner_id, pickup.collector_id}:
         raise ResourceNotFound("The requested pickup was not found.")
@@ -500,7 +504,8 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
 
     if compartment_id:
         compartment = get_or_404(BinCompartment, compartment_id, "The requested compartment was not found.")
-        point = compartment.smart_bin.collection_point
+        smart_bin = compartment.smart_bin
+        point = smart_bin.collection_point
         allowed_material_codes = {compartment.material.code}
     elif bin_id:
         smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
@@ -509,6 +514,10 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     elif payload.get("collection_point_id"):
         point = get_or_404(CollectionPoint, payload["collection_point_id"], "The requested collection point was not found.")
 
+    if smart_bin and smart_bin.owner_id != user.id:
+        raise ResourceNotFound("The requested collection inventory was not found.")
+    if point is None and smart_bin:
+        point = default_owner_collection_point(user)
     if not point or point.owner_id != user.id:
         raise ResourceNotFound("The requested collection inventory was not found.")
     if smart_bin and smart_bin.status == "disabled":

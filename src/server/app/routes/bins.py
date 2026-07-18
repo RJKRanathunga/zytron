@@ -6,7 +6,7 @@ from flask import Blueprint, request
 
 from app.errors import ApiError, ResourceNotFound
 from app.extensions import db
-from app.models import BinCompartment, CollectionPoint, DeviceAlert, PlasticMaterial, SmartBin
+from app.models import BinCompartment, DeviceAlert, PlasticMaterial, SmartBin
 from app.models.base import utc_now
 from app.permissions import current_user
 from app.routes.helpers import data_response, load_payload, paginated_response
@@ -18,7 +18,7 @@ bp = Blueprint("bins", __name__, url_prefix="/bins")
 
 def ensure_bin_owner(user, smart_bin: SmartBin):
     ensure_owner(user)
-    if smart_bin.collection_point.owner_id != user.id:
+    if smart_bin.owner_id != user.id:
         raise ResourceNotFound("The requested bin was not found.")
 
 
@@ -96,9 +96,9 @@ def normalize_bin_status(value: str | None) -> str:
 @bp.get("")
 def list_bins():
     user = current_user()
-    query = SmartBin.query.join(CollectionPoint)
+    query = SmartBin.query
     if user.role == "owner":
-        query = query.filter(CollectionPoint.owner_id == user.id)
+        query = query.filter(SmartBin.owner_id == user.id)
     status = request.args.get("status")
     if status:
         query = query.filter(SmartBin.status == status)
@@ -110,18 +110,17 @@ def create_bin():
     user = current_user()
     ensure_owner(user)
     payload = request.get_json() or {}
-    point_id = payload.get("collection_point_id") or payload.get("collectionPointId")
-    point = get_or_404(CollectionPoint, point_id or "", "The requested collection point was not found.")
-    if point.owner_id != user.id:
-        raise ResourceNotFound("The requested collection point was not found.")
     materials = load_supported_materials(payload)
     smart_bin = SmartBin(
-        collection_point=point,
+        owner=user,
         device_code=payload.get("device_code") or payload.get("deviceCode"),
         name=payload.get("name") or payload.get("label") or "Smart Bin",
         model=payload.get("model") or "PolyLoop S1",
         status=normalize_bin_status(payload.get("status")),
-        location_label=payload.get("location_label") or payload.get("locationLabel") or payload.get("location") or point.name,
+        location_label=payload.get("location_label")
+        or payload.get("locationLabel")
+        or payload.get("location")
+        or (user.organization.name if user.organization else "Smart bin"),
         battery_percent=payload.get("battery_percent") or payload.get("batteryPercent") or 88,
         camera_status=payload.get("camera_status") or payload.get("cameraStatus") or "Manual entry",
         weight_sensor_status=payload.get("weight_sensor_status") or payload.get("weightSensorStatus") or "Manual entry",
@@ -138,7 +137,7 @@ def create_bin():
 def get_bin(bin_id: str):
     user = current_user()
     smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
-    if user.role == "owner" and smart_bin.collection_point.owner_id != user.id:
+    if user.role == "owner" and smart_bin.owner_id != user.id:
         raise ResourceNotFound("The requested bin was not found.")
     return data_response(bin_for_owner(smart_bin))
 
@@ -187,7 +186,7 @@ def delete_bin(bin_id: str):
 def compartments(bin_id: str):
     user = current_user()
     smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
-    if user.role == "owner" and smart_bin.collection_point.owner_id != user.id:
+    if user.role == "owner" and smart_bin.owner_id != user.id:
         raise ResourceNotFound("The requested bin was not found.")
     return data_response(bin_for_owner(smart_bin)["compartments"])
 
@@ -223,7 +222,7 @@ def update_compartment(bin_id: str, compartment_id: str):
 def bin_alerts(bin_id: str):
     user = current_user()
     smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
-    if user.role == "owner" and smart_bin.collection_point.owner_id != user.id:
+    if user.role == "owner" and smart_bin.owner_id != user.id:
         raise ResourceNotFound("The requested bin was not found.")
     return data_response(
         [

@@ -8,7 +8,8 @@ class SmartBin(TimestampMixin, db.Model):
     __tablename__ = "smart_bins"
 
     id = db.Column(db.String(64), primary_key=True, default=lambda: new_id("bin"))
-    collection_point_id = db.Column(db.String(64), db.ForeignKey("collection_points.id"), nullable=False, index=True)
+    owner_id = db.Column(db.String(64), db.ForeignKey("users.id"), nullable=False, index=True)
+    collection_point_id = db.Column(db.String(64), db.ForeignKey("collection_points.id"), index=True)
     device_code = db.Column(db.String(80), unique=True, nullable=False, index=True)
     device_secret = db.Column(db.String(255))
     name = db.Column(db.String(120), nullable=False)
@@ -24,6 +25,7 @@ class SmartBin(TimestampMixin, db.Model):
     camera_status = db.Column(db.String(80), default="Online", nullable=False)
     weight_sensor_status = db.Column(db.String(80), default="Online", nullable=False)
 
+    owner = db.relationship("User")
     collection_point = db.relationship("CollectionPoint", back_populates="smart_bins")
     compartments = db.relationship("BinCompartment", back_populates="smart_bin", cascade="all, delete-orphan")
     alerts = db.relationship("DeviceAlert", back_populates="smart_bin", cascade="all, delete-orphan")

@@ -71,7 +71,8 @@ CREATE TABLE collection_points (
 
 CREATE TABLE smart_bins (
   id VARCHAR(64) PRIMARY KEY,
-  collection_point_id VARCHAR(64) NOT NULL REFERENCES collection_points(id),
+  owner_id VARCHAR(64) NOT NULL REFERENCES users(id),
+  collection_point_id VARCHAR(64) REFERENCES collection_points(id),
   device_code VARCHAR(80) NOT NULL UNIQUE,
   device_secret VARCHAR(255),
   name VARCHAR(120) NOT NULL,
@@ -340,6 +341,7 @@ CREATE UNIQUE INDEX ix_users_firebase_uid ON users(firebase_uid);
 CREATE INDEX ix_collection_points_owner_id ON collection_points(owner_id);
 CREATE INDEX ix_collection_points_district ON collection_points(district);
 CREATE INDEX ix_smart_bins_collection_point_id ON smart_bins(collection_point_id);
+CREATE INDEX ix_smart_bins_owner_id ON smart_bins(owner_id);
 CREATE INDEX ix_bin_compartments_smart_bin_id ON bin_compartments(smart_bin_id);
 CREATE INDEX ix_plastic_lots_owner_id ON plastic_lots(owner_id);
 CREATE INDEX ix_plastic_lots_status ON plastic_lots(status);

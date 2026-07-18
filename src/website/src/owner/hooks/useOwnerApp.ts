@@ -61,7 +61,6 @@ export interface OwnerAppContext {
 }
 
 export interface SmartBinFormInput {
-  collectionPointId: string
   label: string
   deviceCode: string
   location: string
