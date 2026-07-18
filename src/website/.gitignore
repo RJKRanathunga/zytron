@@ -29,3 +29,4 @@ config
 !/config/app-config.d.ts
 !/config/firebase-config.js
 !/config/firebase-config.d.ts
+/config/app-config.js
