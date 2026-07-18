@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { MaterialBadge } from '../common/MaterialBadge'
 import { Modal } from './Modal'
-import type { CollectionPoint, PlasticLot } from '../../types/domain'
-import { formatCurrency, formatKg, getLotValue, getRouteDistance } from '../../utils/format'
+import type { PlasticLot } from '../../types/domain'
+import { formatCurrency, formatKg, getLotValue } from '../../utils/format'
 
 interface CollectorModalsProps {
   reserveLot: PlasticLot | null
   routeLots: PlasticLot[]
-  points: CollectionPoint[]
   isRouteOpen: boolean
   onClose: () => void
   onReserve: (lotId: string, date: string, timeWindow: string) => void
@@ -17,7 +16,6 @@ interface CollectorModalsProps {
 export function CollectorModals({
   reserveLot,
   routeLots,
-  points,
   isRouteOpen,
   onClose,
   onReserve,
@@ -101,8 +99,8 @@ export function CollectorModals({
               <strong>{formatKg(routeKg)}</strong>
             </div>
             <div>
-              <small>Estimated distance</small>
-              <strong>{getRouteDistance(routeLots, points)} km</strong>
+              <small>Route distance</small>
+              <strong>Calculated by Google Routes</strong>
             </div>
             <div>
               <small>Purchase value</small>

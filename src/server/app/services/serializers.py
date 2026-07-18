@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from math import atan2, cos, radians, sin, sqrt
 
 from app.models import (
     BinCompartment,
@@ -20,10 +19,6 @@ from app.models import (
     Transaction,
     User,
 )
-
-MORATUWA_LAT = 6.7969
-MORATUWA_LNG = 79.9008
-
 
 def as_float(value) -> float:
     if value is None:
@@ -48,14 +43,6 @@ def iso(dt: datetime | None) -> str | None:
     if not dt.tzinfo:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).isoformat()
-
-
-def haversine_km(lat: float, lng: float, origin_lat: float = MORATUWA_LAT, origin_lng: float = MORATUWA_LNG) -> float:
-    radius = 6371
-    dlat = radians(lat - origin_lat)
-    dlng = radians(lng - origin_lng)
-    a = sin(dlat / 2) ** 2 + cos(radians(origin_lat)) * cos(radians(lat)) * sin(dlng / 2) ** 2
-    return radius * 2 * atan2(sqrt(a), sqrt(1 - a))
 
 
 def collector_lot_status(lot: PlasticLot) -> str:
@@ -115,13 +102,14 @@ def collection_point_for_collector(point: CollectionPoint, user: User, saved_ids
         "initials": initials(point.name),
         "district": point.district or point.city or "",
         "address": point.address,
-        "distanceKm": round(haversine_km(as_float(point.latitude), as_float(point.longitude)), 1),
+        "latitude": as_float(point.latitude),
+        "longitude": as_float(point.longitude),
+        "distanceKm": None,
         "rating": as_float(point.rating),
         "handovers": point.handovers,
         "monthlyKg": round(sum(as_float(comp.current_weight_kg) for smart_bin in point.smart_bins for comp in smart_bin.compartments), 1),
         "reliabilityScore": point.reliability_score,
         "saved": point.id in saved_ids,
-        "coordinates": {"x": min(86, max(8, int((as_float(point.longitude) - 79.86) * 1400))), "y": min(80, max(14, int((6.86 - as_float(point.latitude)) * 900)))},
         "supportedMaterials": sorted(material_codes) or ["PP"],
         "accessNote": point.access_instructions or point.opening_hours or "",
     }
@@ -134,7 +122,8 @@ def collection_point_for_owner(point: CollectionPoint) -> dict:
         "address": point.address,
         "district": point.district or point.city or "",
         "accessWindow": point.opening_hours or "",
-        "coordinates": {"x": min(82, max(18, int((as_float(point.longitude) - 79.86) * 1500))), "y": min(76, max(18, int((6.86 - as_float(point.latitude)) * 1000)))},
+        "latitude": as_float(point.latitude),
+        "longitude": as_float(point.longitude),
     }
 
 
@@ -229,7 +218,7 @@ def pickup_for_collector(pickup: Pickup) -> dict:
         "timeWindow": pickup.time_window or "Flexible",
         "status": collector_pickup_status(pickup),
         "price": money(pickup.total_amount),
-        "distanceKm": round(haversine_km(as_float(point.latitude), as_float(point.longitude)), 1),
+        "distanceKm": None,
         "qrCode": pickup.qr_code,
     }
 

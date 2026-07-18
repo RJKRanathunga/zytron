@@ -28,16 +28,14 @@ export interface CollectionPoint {
   initials: string
   district: string
   address: string
-  distanceKm: number
   rating: number
   handovers: number
   monthlyKg: number
   reliabilityScore: number
   saved: boolean
-  coordinates: {
-    x: number
-    y: number
-  }
+  latitude: number
+  longitude: number
+  distanceKm?: number | null
   supportedMaterials: PlasticMaterial[]
   accessNote: string
 }
@@ -81,7 +79,7 @@ export interface Pickup {
   timeWindow: string
   status: PickupStatus
   price: number
-  distanceKm: number
+  distanceKm?: number | null
   qrCode: string
 }
 

@@ -33,7 +33,6 @@ from app.models.base import new_id, utc_now
 from app.services.serializers import (
     as_float,
     collector_snapshot,
-    haversine_km,
     owner_snapshot,
 )
 
@@ -475,28 +474,39 @@ def save_route(user: User, payload: dict) -> RoutePlan:
 
     total_weight = Decimal("0")
     total_cost = Decimal("0")
-    total_distance = Decimal("0")
+    route_locations = []
     for index, lot_id in enumerate(lot_ids, start=1):
         lot = get_or_404(PlasticLot, lot_id, "A route lot could not be found.")
         if lot.status not in {"available", "reserved", "pickup_scheduled"}:
             raise InvalidState("Only active lots can be added to a route.")
         total_weight += lot.estimated_weight_kg
         total_cost += lot.estimated_weight_kg * lot.price_per_kg
-        total_distance += Decimal(str(round(haversine_km(as_float(lot.collection_point.latitude), as_float(lot.collection_point.longitude)), 2)))
+        route_locations.append({"lat": as_float(lot.collection_point.latitude), "lng": as_float(lot.collection_point.longitude)})
         db.session.add(
             RouteStop(
                 route_plan=route,
                 lot=lot,
                 collection_point_id=lot.collection_point_id,
                 stop_order=index,
-                estimated_arrival_at=f"{8 + index}:00 AM",
+                estimated_arrival_at="",
             )
         )
 
     route.estimated_total_weight_kg = total_weight
     route.estimated_total_cost = total_cost
-    route.estimated_distance_km = total_distance
-    route.estimated_duration_minutes = len(lot_ids) * 24 + int(as_float(total_distance) * 2)
+    route.estimated_distance_km = Decimal("0")
+    route.estimated_duration_minutes = 0
+    if route_locations:
+        from app.errors import ApiError
+        from app.services.google_maps import compute_route
+
+        try:
+            estimate = compute_route(route_locations[0], route_locations[1:] or route_locations[:1])
+        except ApiError:
+            estimate = None
+        if estimate:
+            route.estimated_distance_km = Decimal(str(estimate["distanceKm"]))
+            route.estimated_duration_minutes = estimate["durationMinutes"]
     create_notification(user.id, "route", "Route saved", f"{len(lot_ids)} stops were saved for {route.route_date}.", "route", route.id)
     db.session.commit()
     return route

@@ -47,6 +47,7 @@ class BaseConfig:
     ]
     JSON_SORT_KEYS = False
     MAX_PAGE_SIZE = 100
+    GOOGLE_MAPS_SERVER_API_KEY = os.getenv("GOOGLE_MAPS_SERVER_API_KEY", "")
 
 
 class DevelopmentConfig(BaseConfig):

@@ -30,7 +30,7 @@ export function Marketplace() {
         if (app.sortMode === 'distance') {
           const firstPoint = getPointForLot(first, app.points)
           const secondPoint = getPointForLot(second, app.points)
-          return (firstPoint?.distanceKm ?? 99) - (secondPoint?.distanceKm ?? 99)
+          return (firstPoint?.distanceKm ?? Number.POSITIVE_INFINITY) - (secondPoint?.distanceKm ?? Number.POSITIVE_INFINITY)
         }
         if (app.sortMode === 'price') return first.pricePerKg - second.pricePerKg
         if (app.sortMode === 'quantity') return second.quantityKg - first.quantityKg

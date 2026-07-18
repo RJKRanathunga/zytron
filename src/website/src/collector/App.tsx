@@ -290,7 +290,6 @@ function App() {
       <CollectorModals
         reserveLot={reserveLot}
         routeLots={routeLots}
-        points={points}
         isRouteOpen={isRouteModalOpen}
         onClose={() => {
           setReserveLotId(null)

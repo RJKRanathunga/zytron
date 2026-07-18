@@ -49,6 +49,26 @@ class CollectionPointSchema(BaseSchema):
     contact_phone = fields.String(load_default="")
 
 
+class LatLngSchema(BaseSchema):
+    lat = fields.Decimal(required=True, as_string=False, validate=validate.Range(min=-90, max=90))
+    lng = fields.Decimal(required=True, as_string=False, validate=validate.Range(min=-180, max=180))
+
+
+class GeocodeSchema(BaseSchema):
+    address = fields.String(required=True, validate=validate.Length(min=2, max=500))
+
+
+class RouteCalculationSchema(BaseSchema):
+    origin = fields.Nested(LatLngSchema, required=True)
+    destinations = fields.List(fields.Nested(LatLngSchema), load_default=list)
+    destination = fields.Nested(LatLngSchema, load_default=None, allow_none=True)
+
+    @validates_schema
+    def require_destination(self, data, **_kwargs):
+        if not data.get("destinations") and not data.get("destination"):
+            raise ValidationError({"destinations": ["At least one destination is required."]})
+
+
 class PublishLotSchema(BaseSchema):
     status = fields.String(load_default=None, allow_none=True, validate=validate.OneOf(["draft", "available", "published", None]))
     binId = fields.String(data_key="binId", load_default=None, allow_none=True)

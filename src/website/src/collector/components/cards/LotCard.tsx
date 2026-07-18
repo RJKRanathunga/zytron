@@ -32,9 +32,7 @@ export function LotCard({
           <Link className="card-link" to={`/collector/marketplace/${lot.id}`}>
             {lot.title}
           </Link>
-          <small>
-            {point?.name ?? 'Collection point'} - {point?.distanceKm.toFixed(1) ?? '0.0'} km
-          </small>
+          <small>{point ? `${point.name} - ${point.address}` : 'Collection point'}</small>
         </div>
         <div className="lot-price">
           <b>{formatCurrency(getLotValue(lot))}</b>

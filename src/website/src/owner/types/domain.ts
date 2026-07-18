@@ -30,10 +30,8 @@ export interface CollectionPoint {
   address: string
   district: string
   accessWindow: string
-  coordinates: {
-    x: number
-    y: number
-  }
+  latitude: number
+  longitude: number
 }
 
 export interface BinCompartment {

@@ -9,7 +9,7 @@ import { SegmentedControl } from '../components/common/SegmentedControl'
 import { SupplyMap } from '../components/maps/SupplyMap'
 import { useCollectorApp } from '../hooks/useCollectorApp'
 import type { MaterialFilter } from '../types/domain'
-import { formatCurrency, formatKg, getPointForLot, getRouteDistance } from '../utils/format'
+import { formatCurrency, formatKg, getLotValue, getPointForLot } from '../utils/format'
 
 const materialOptions: readonly MaterialFilter[] = ['PP', 'PET', 'HDPE']
 
@@ -32,6 +32,9 @@ export function Dashboard() {
   )
 
   const matchingSupply = app.lots.reduce((total, lot) => total + lot.quantityKg, 0)
+  const ppLots = app.lots.filter((lot) => lot.material === 'PP')
+  const ppSupplyKg = ppLots.reduce((total, lot) => total + lot.quantityKg, 0)
+  const ppSupplyValue = ppLots.reduce((total, lot) => total + getLotValue(lot), 0)
   const reservedKg = app.pickups
     .filter((pickup) => pickup.status === 'confirmed' || pickup.status === 'awaiting')
     .reduce((total, pickup) => total + pickup.quantityKg, 0)
@@ -61,10 +64,10 @@ export function Dashboard() {
       <section className="hero">
         <div className="hero-copy">
           <span className="hero-badge">Best collection opportunity</span>
-          <h2>74 kg of matching PP is available across a compact 18 km route.</h2>
+          <h2>{formatKg(ppSupplyKg)} of matching PP is available from verified collection points.</h2>
           <p>
-            Three verified collection points match your active PP demand. Reserve the suggested route before the
-            highest-value lots are booked.
+            Build a route from live collection-point locations and let Google Routes calculate the travel distance and
+            drive time before you commit.
           </p>
           <div className="hero-actions">
             <button className="btn light" type="button" onClick={app.openRouteModal}>
@@ -81,31 +84,18 @@ export function Dashboard() {
               <i>PC</i>
             </div>
             <span>
-              <strong>3 verified points</strong> - estimated purchase value {formatCurrency(7860)}
+              <strong>{new Set(ppLots.map((lot) => lot.collectionPointId)).size} verified points</strong> - estimated purchase value {formatCurrency(ppSupplyValue)}
             </span>
           </div>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="route-map">
-            <i className="route-line"></i>
-            <span className="map-pin p1">
-              <span>28</span>
-            </span>
-            <span className="map-pin p2">
-              <span>16</span>
-            </span>
-            <span className="map-pin p3">
-              <span>30</span>
-            </span>
-            <span className="truck">TR</span>
-          </div>
+        <div className="hero-art real-route-art" aria-hidden="true">
           <div className="floating f1">
-            <strong>74 kg PP</strong>
-            <small>3 collection stops</small>
+            <strong>{formatKg(ppSupplyKg)} PP</strong>
+            <small>{ppLots.length} available lots</small>
           </div>
           <div className="floating f2">
-            <strong>18 km</strong>
-            <small>optimized distance</small>
+            <strong>{formatCurrency(ppSupplyValue)}</strong>
+            <small>estimated purchase value</small>
           </div>
         </div>
       </section>
@@ -113,7 +103,7 @@ export function Dashboard() {
       <section className="metrics">
         <MetricCard tone="mint" icon="M" label="Matching supply nearby" value={formatKg(matchingSupply)} detail={`${app.lots.length} available lots`} />
         <MetricCard tone="sun" icon="P" label="Reserved for pickup" value={formatKg(reservedKg)} detail="3 active stops" />
-        <MetricCard tone="blue" icon="R" label="Planned route" value={`${getRouteDistance(routeLots, app.points)} km`} detail="27% less travel" />
+        <MetricCard tone="blue" icon="R" label="Planned route" value={`${routeLots.length} stops`} detail="Google route calculated on the route map" />
         <MetricCard tone="violet" icon="$" label="Estimated margin" value={formatCurrency(reservedValue)} detail="Across current reservations" />
       </section>
 

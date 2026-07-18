@@ -383,8 +383,8 @@ def seed_database():
         name="PP Route - Saturday AM",
         route_date="Sat 18 Jul",
         status="draft",
-        estimated_distance_km=Decimal("18"),
-        estimated_duration_minutes=52,
+        estimated_distance_km=Decimal("0"),
+        estimated_duration_minutes=0,
         estimated_total_weight_kg=Decimal("74.4"),
         estimated_total_cost=Decimal("7596"),
     )
@@ -428,7 +428,7 @@ def seed_database():
     for note_id, note_user, note_type, title, message, is_read in [
         ("note-owner-offer", owner, "offer", "New collector offer", "GreenNova offered Rs. 3,210 for the ready PP lot.", False),
         ("note-owner-bin", owner, "bin", "PP bin is ready", "Smart Bin A-03 crossed the pickup threshold.", False),
-        ("note-collector-route", collector, "route", "Compact PP route found", "Three PP lots can be collected in one 18 km run.", False),
+        ("note-collector-route", collector, "route", "Route planner ready", "Add selected PP lots to calculate distance and travel time with Google Routes.", False),
         ("note-collector-pet", collector, "supply", "New PET lot nearby", "Katubedda Supermarket has 41 kg ready for pickup.", False),
     ]:
         upsert(Notification, note_id, user=note_user, type=note_type, title=title, message=message, is_read=is_read, resource_type="seed", resource_id="seed")

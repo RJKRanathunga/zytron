@@ -93,12 +93,12 @@ export function Sidebar({
       <section className="sidebar-card">
         <div className="icon">RT</div>
         <strong>Route opportunity</strong>
-        <p>Three matching PP lots can form a 74 kg route within 18 km.</p>
+        <p>Build a route from live collection-point locations and calculate travel with Google Routes.</p>
         <button
           type="button"
-          onClick={() => onAction('Optimized route opened', 'The PP route planner is ready for review.')}
+          onClick={() => onAction('Route planner opened', 'Add stops to calculate distance and travel time.')}
         >
-          Optimize this route
+          Open route planner
         </button>
       </section>
       <div className="profile">
