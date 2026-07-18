@@ -1,6 +1,6 @@
 import { apiRequest } from '../../services/apiClient'
 import { authService } from '../../auth/authService'
-import type { LotPlasticItem, OwnerSnapshot } from '../types/domain'
+import type { Dustbin, LotPlasticItem, OwnerSnapshot } from '../types/domain'
 import type { CheckoutSession, SellerBilling, SellerPackage } from '../types/domain'
 
 export interface OwnerService {
@@ -9,8 +9,11 @@ export interface OwnerService {
   loadSnapshot: () => Promise<OwnerSnapshot>
   loadPackages: () => Promise<SellerPackage[]>
   loadBilling: () => Promise<SellerBilling>
-  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => Promise<OwnerSnapshot>
+  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[], dustbinId?: string) => Promise<OwnerSnapshot>
   updateLot: (lotId: string, input: LotUpdateInput) => Promise<OwnerSnapshot>
+  createDustbin: (input: DustbinInput) => Promise<OwnerSnapshot>
+  updateDustbin: (dustbinId: string, input: DustbinInput) => Promise<OwnerSnapshot>
+  deleteDustbin: (dustbinId: string) => Promise<{ snapshot: OwnerSnapshot; message?: string }>
   createSubscriptionCheckout: () => Promise<CheckoutSession>
   cancelSubscription: () => Promise<SellerBilling>
   createListingPaymentCheckout: (lotId: string) => Promise<CheckoutSession>
@@ -38,6 +41,18 @@ export interface OwnerProfileUpdate {
 export interface LotUpdateInput {
   pricePerKg: number
   plasticItems: LotPlasticItem[]
+  dustbinId?: string
+}
+
+export interface DustbinInput {
+  name: string
+  code: string
+  locationAddress: string
+  latitude: number
+  longitude: number
+  supportedPlasticType: Dustbin['supportedPlasticType']
+  description: string
+  isActive: boolean
 }
 
 async function reloadSnapshot(): Promise<OwnerSnapshot> {
@@ -55,10 +70,10 @@ export const ownerService: OwnerService = {
 
   loadBilling: () => apiRequest<SellerBilling>('/seller/billing'),
 
-  publishLot: async (binId, pricePerKg, pickupWindow, plasticItems) => {
+  publishLot: async (binId, pricePerKg, pickupWindow, plasticItems, dustbinId) => {
     await apiRequest('/lots', {
       method: 'POST',
-      body: JSON.stringify({ binId, pricePerKg, pickupWindow, plasticItems }),
+      body: JSON.stringify({ binId, pricePerKg, pickupWindow, plasticItems, dustbinId }),
     })
     return reloadSnapshot()
   },
@@ -69,6 +84,29 @@ export const ownerService: OwnerService = {
       body: JSON.stringify(input),
     })
     return reloadSnapshot()
+  },
+
+  createDustbin: async (input) => {
+    await apiRequest('/owner/dustbins', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+    return reloadSnapshot()
+  },
+
+  updateDustbin: async (dustbinId, input) => {
+    await apiRequest(`/owner/dustbins/${dustbinId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    })
+    return reloadSnapshot()
+  },
+
+  deleteDustbin: async (dustbinId) => {
+    const result = await apiRequest<{ deleted: boolean; inactive?: boolean; message?: string }>(`/owner/dustbins/${dustbinId}`, {
+      method: 'DELETE',
+    })
+    return { snapshot: await reloadSnapshot(), message: result.message }
   },
 
   createSubscriptionCheckout: () => apiRequest<CheckoutSession>('/seller/subscription/checkout', { method: 'POST' }),

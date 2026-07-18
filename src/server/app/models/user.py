@@ -50,6 +50,7 @@ class User(TimestampMixin, db.Model):
     seller_subscriptions = db.relationship("SellerSubscription", back_populates="seller", foreign_keys="SellerSubscription.seller_id")
     listing_payments = db.relationship("ListingPayment", back_populates="seller", foreign_keys="ListingPayment.seller_id")
     payment_transactions = db.relationship("PaymentTransaction", back_populates="seller", foreign_keys="PaymentTransaction.seller_id")
+    dustbins = db.relationship("Dustbin", back_populates="owner", foreign_keys="Dustbin.owner_id")
 
     @property
     def display_name(self) -> str:

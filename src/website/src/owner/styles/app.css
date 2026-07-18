@@ -520,6 +520,12 @@ a {
   border-color: var(--mint);
 }
 
+.btn.danger,
+.btn.secondary.danger {
+  border: 1px solid var(--coral-light);
+  color: #a64a42;
+}
+
 .btn.light {
   background: #ffffff;
   color: var(--forest);
@@ -1595,6 +1601,58 @@ a {
   gap: 10px;
 }
 
+.dustbin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dustbin-list.compact {
+  gap: 8px;
+}
+
+.dustbin-card {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 42px 1fr auto;
+  gap: 11px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.dustbin-card.active,
+.dustbin-card:hover {
+  border-color: var(--mint);
+  background: var(--mint-light);
+}
+
+.dustbin-card strong,
+.dustbin-card small {
+  display: block;
+}
+
+.dustbin-card strong {
+  font-size: 10px;
+}
+
+.dustbin-card small {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.dustbin-card .status {
+  margin-top: 0;
+}
+
+.dustbin-form-panel {
+  margin-top: 17px;
+}
+
 .demand {
   display: grid;
   grid-template-columns: 38px 1fr auto;
@@ -1940,6 +1998,49 @@ a {
   color: var(--ink);
   font-size: 10px;
   outline: 0;
+}
+
+.field-error {
+  display: block;
+  margin-top: 5px;
+  color: #a64a42;
+  font-size: 8px;
+}
+
+.plastic-editor {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.plastic-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(110px, 0.4fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdfc;
+}
+
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.check-line input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--forest);
+}
+
+.compact-field {
+  margin-bottom: 0;
 }
 
 .toast {
@@ -2537,14 +2638,17 @@ td small {
   .request,
   .partner,
   .demand,
-  .material-row {
+  .material-row,
+  .dustbin-card,
+  .plastic-row {
     grid-template-columns: 40px 1fr;
   }
 
   .lot-price,
   .request-price,
   .score,
-  .match {
+  .match,
+  .dustbin-card .status {
     grid-column: 2;
     text-align: left;
   }

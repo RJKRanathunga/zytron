@@ -12,7 +12,7 @@ export function LotsPage() {
         <div>
           <span className="eyebrow">Available plastic lots</span>
           <h1>Publish, edit or withdraw plastic visible to collectors.</h1>
-          <p>Lots are frontend-only for now, but the workflow mirrors the future Flask API contract.</p>
+          <p>Each lot keeps manually entered plastic weights and can optionally be linked to one of your registered dustbins.</p>
         </div>
         <button className="btn primary" type="button" onClick={() => app.openPublishModal()}>
           Publish lot

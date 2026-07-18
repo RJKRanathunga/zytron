@@ -58,11 +58,27 @@ export interface SmartBin {
   compartments: BinCompartment[]
 }
 
+export interface Dustbin {
+  id: string
+  name: string
+  code: string
+  locationAddress: string
+  latitude: number
+  longitude: number
+  supportedPlasticType: PlasticMaterial
+  description: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PlasticLot {
   id: string
   material: PlasticMaterial
   title: string
   binId: string
+  dustbinId: string
+  dustbinLabel: string
   quantityKg: number
   totalWeightKg: number
   weightUnit: 'kg'
@@ -225,6 +241,7 @@ export interface OwnerSnapshot {
   user: OwnerUser
   collectionPoints: CollectionPoint[]
   smartBins: SmartBin[]
+  dustbins: Dustbin[]
   lots: PlasticLot[]
   offers: CollectorOffer[]
   pickups: Pickup[]

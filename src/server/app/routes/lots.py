@@ -7,7 +7,7 @@ from sqlalchemy import or_
 
 from app.errors import ApiError, ResourceNotFound
 from app.extensions import db
-from app.models import CollectionPoint, LotPlasticItem, PlasticLot
+from app.models import CollectionPoint, Dustbin, LotPlasticItem, PlasticLot
 from app.permissions import current_user
 from app.routes.helpers import data_response, load_payload, paginated_response
 from app.schemas import PublishLotSchema
@@ -80,11 +80,20 @@ def create_lot():
         point = get_or_404(CollectionPoint, payload.get("collection_point_id", ""), "The requested collection point was not found.")
         if point.owner_id != user.id:
             raise ResourceNotFound("The requested collection point was not found.")
+        dustbin_id = payload.get("dustbinId") or payload.get("dustbin_id")
+        dustbin = None
+        if dustbin_id:
+            dustbin = get_or_404(Dustbin, dustbin_id, "The requested dustbin was not found.")
+            if dustbin.owner_id != user.id:
+                raise ResourceNotFound("The requested dustbin was not found.")
+            if not dustbin.is_active:
+                raise ApiError("invalid_status_transition", "Inactive dustbins cannot be linked to lots.", 422)
         plastic_items, total_weight, material = validate_lot_plastic_items(payload)
         lot = PlasticLot(
             owner=user,
             collection_point=point,
             material=material,
+            dustbin=dustbin,
             title=payload.get("title") or f"Draft {material.code} lot",
             description=payload.get("description") or "",
             estimated_weight_kg=total_weight,
@@ -126,6 +135,17 @@ def update_lot(lot_id: str):
         lot.material = material
         lot.estimated_weight_kg = total_weight
         replace_lot_plastic_items(lot, plastic_items)
+    if "dustbinId" in payload or "dustbin_id" in payload:
+        dustbin_id = payload.get("dustbinId") or payload.get("dustbin_id")
+        if dustbin_id:
+            dustbin = get_or_404(Dustbin, dustbin_id, "The requested dustbin was not found.")
+            if dustbin.owner_id != user.id:
+                raise ResourceNotFound("The requested dustbin was not found.")
+            if not dustbin.is_active:
+                raise ApiError("invalid_status_transition", "Inactive dustbins cannot be linked to lots.", 422)
+            lot.dustbin = dustbin
+        else:
+            lot.dustbin = None
     for key in ["title", "description", "quality_grade"]:
         if key in payload:
             setattr(lot, key, payload[key])

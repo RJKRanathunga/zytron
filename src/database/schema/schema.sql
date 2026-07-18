@@ -69,6 +69,22 @@ CREATE TABLE collection_points (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+CREATE TABLE dustbins (
+  id VARCHAR(64) PRIMARY KEY,
+  owner_id VARCHAR(64) NOT NULL REFERENCES users(id),
+  name VARCHAR(120) NOT NULL,
+  code VARCHAR(80) NOT NULL,
+  location_address VARCHAR(255) NOT NULL,
+  latitude NUMERIC(10, 7) NOT NULL,
+  longitude NUMERIC(10, 7) NOT NULL,
+  supported_plastic_type VARCHAR(32) NOT NULL,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  CONSTRAINT uq_dustbins_owner_code UNIQUE (owner_id, code)
+);
+
 CREATE TABLE smart_bins (
   id VARCHAR(64) PRIMARY KEY,
   collection_point_id VARCHAR(64) NOT NULL REFERENCES collection_points(id),
@@ -120,6 +136,7 @@ CREATE TABLE plastic_lots (
   collection_point_id VARCHAR(64) NOT NULL REFERENCES collection_points(id),
   material_id VARCHAR(64) NOT NULL REFERENCES plastic_materials(id),
   source_compartment_id VARCHAR(64) REFERENCES bin_compartments(id),
+  dustbin_id VARCHAR(64) REFERENCES dustbins(id),
   title VARCHAR(180) NOT NULL,
   description TEXT,
   estimated_weight_kg NUMERIC(10, 2) NOT NULL,

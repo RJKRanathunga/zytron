@@ -15,6 +15,7 @@ from app.models import (
     CollectorOffer,
     DemandAlert,
     DeviceAlert,
+    Dustbin,
     Message,
     MessageThread,
     Notification,
@@ -181,7 +182,11 @@ def validate_lot_plastic_items(payload: dict, allowed_material_codes: set[str] |
 
 
 def replace_lot_plastic_items(lot: PlasticLot, items: list[dict]) -> None:
+    for existing in list(lot.plastic_items):
+        db.session.delete(existing)
     lot.plastic_items[:] = []
+    if lot.id:
+        db.session.flush()
     for item in items:
         lot.plastic_items.append(
             LotPlasticItem(
@@ -488,9 +493,18 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     ensure_owner(user)
     bin_id = payload.get("binId") or payload.get("bin_id")
     compartment_id = payload.get("compartmentId") or payload.get("compartment_id")
+    dustbin_id = payload.get("dustbinId") or payload.get("dustbin_id")
     compartment: BinCompartment | None = None
     point: CollectionPoint | None = None
+    dustbin: Dustbin | None = None
     allowed_material_codes: set[str] | None = None
+
+    if dustbin_id:
+        dustbin = get_or_404(Dustbin, dustbin_id, "The requested dustbin was not found.")
+        if dustbin.owner_id != user.id:
+            raise ResourceNotFound("The requested dustbin was not found.")
+        if not dustbin.is_active:
+            raise InvalidState("Inactive dustbins cannot be linked to new lots.")
 
     if compartment_id:
         compartment = get_or_404(BinCompartment, compartment_id, "The requested compartment was not found.")
@@ -530,6 +544,7 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
         collection_point=point,
         material=material,
         source_compartment=compartment,
+        dustbin=dustbin,
         title=title,
         description=payload.get("description") or f"{title} from {point.name}",
         estimated_weight_kg=quantity,

@@ -28,6 +28,9 @@ export function Dashboard() {
           <button className="btn secondary" type="button" onClick={() => navigate('/owner/bins')}>
             Manage bins
           </button>
+          <button className="btn secondary" type="button" onClick={() => navigate('/owner/dustbins')}>
+            My Dustbins
+          </button>
           <button className="btn primary" type="button" onClick={() => navigate('/owner/offers')}>
             Review {app.offers.filter((offer) => offer.status === 'new').length} offers
           </button>
@@ -37,7 +40,7 @@ export function Dashboard() {
       <section className="hero">
         <div className="hero-copy">
           <span className="hero-badge">Priority action</span>
-          <h2>Your PP bin is full and three collectors are ready to buy.</h2>
+          <h2>Your PP plastic lot is ready to be listed - publish it and connect with interested collectors.</h2>
           <p>
             Enter the PP lot weight manually before publishing or compare current offers. The strongest offer is{' '}
             {formatCurrency(bestOffer?.price ?? 0)} with pickup available tomorrow morning.
@@ -153,6 +156,32 @@ export function Dashboard() {
       </section>
 
       <section className="grid-equal">
+        <article className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">My Dustbins</span>
+              <h3>Registered owner dustbins</h3>
+            </div>
+            <button className="text-btn" type="button" onClick={() => navigate('/owner/dustbins')}>
+              Manage
+            </button>
+          </div>
+          <div className="dustbin-list compact">
+            {app.dustbins.slice(0, 4).map((dustbin) => (
+              <button className="dustbin-card" key={dustbin.id} type="button" onClick={() => navigate('/owner/dustbins')}>
+                <span className="demand-icon">{dustbin.supportedPlasticType}</span>
+                <span>
+                  <strong>{dustbin.name}</strong>
+                  <small>{dustbin.code} - {dustbin.locationAddress}</small>
+                </span>
+                <i className={`status ${dustbin.isActive ? 'online' : 'withdrawn'}`}>{dustbin.isActive ? 'active' : 'inactive'}</i>
+              </button>
+            ))}
+            {app.dustbins.length === 0 ? (
+              <div className="page-note">No registered dustbins yet. Add one before linking a lot to a dustbin.</div>
+            ) : null}
+          </div>
+        </article>
         <article className="panel">
           <div className="panel-heading">
             <div>

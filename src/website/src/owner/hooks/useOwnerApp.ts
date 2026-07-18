@@ -3,6 +3,7 @@ import type {
   CollectorOffer,
   CollectionPoint,
   DeviceAlert,
+  Dustbin,
   ImpactMetric,
   MaterialFilter,
   MessageThread,
@@ -21,6 +22,7 @@ export interface OwnerAppContext {
   user: OwnerUser
   collectionPoints: CollectionPoint[]
   smartBins: SmartBin[]
+  dustbins: Dustbin[]
   lots: PlasticLot[]
   offers: CollectorOffer[]
   pickups: Pickup[]
@@ -43,8 +45,11 @@ export interface OwnerAppContext {
   openPublishModal: (binId?: string) => void
   openEditLotModal: (lotId: string) => void
   openScheduleModal: (offerId: string) => void
-  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => void
+  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[], dustbinId?: string) => void
   updateLot: (lotId: string, pricePerKg: number, plasticItems: LotPlasticItem[]) => void
+  createDustbin: (input: DustbinFormInput) => Promise<void>
+  updateDustbin: (dustbinId: string, input: DustbinFormInput) => Promise<void>
+  deleteDustbin: (dustbinId: string) => Promise<void>
   startListingPayment: (lotId: string) => void
   withdrawLot: (lotId: string) => void
   acceptOffer: (offerId: string, pickupDate: string, timeWindow: string) => void
@@ -54,6 +59,17 @@ export interface OwnerAppContext {
   updateProfile: (input: { phone: string }) => void
   logout: () => void
   showToast: (message: ToastMessage) => void
+}
+
+export interface DustbinFormInput {
+  name: string
+  code: string
+  locationAddress: string
+  latitude: number
+  longitude: number
+  supportedPlasticType: Dustbin['supportedPlasticType']
+  description: string
+  isActive: boolean
 }
 
 export function useOwnerApp() {

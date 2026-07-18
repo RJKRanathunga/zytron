@@ -11,6 +11,7 @@ from app.models import (
     CollectorOffer,
     DemandAlert,
     DeviceAlert,
+    Dustbin,
     MessageThread,
     Notification,
     ListingPayment,
@@ -249,6 +250,22 @@ def collection_point_for_owner(point: CollectionPoint) -> dict:
     }
 
 
+def dustbin_for_owner(dustbin: Dustbin) -> dict:
+    return {
+        "id": dustbin.id,
+        "name": dustbin.name,
+        "code": dustbin.code,
+        "locationAddress": dustbin.location_address,
+        "latitude": as_float(dustbin.latitude),
+        "longitude": as_float(dustbin.longitude),
+        "supportedPlasticType": dustbin.supported_plastic_type,
+        "description": dustbin.description or "",
+        "isActive": dustbin.is_active,
+        "createdAt": iso(dustbin.created_at),
+        "updatedAt": iso(dustbin.updated_at),
+    }
+
+
 def lot_for_collector(lot: PlasticLot) -> dict:
     point = lot.collection_point
     return {
@@ -282,6 +299,8 @@ def lot_for_owner(lot: PlasticLot) -> dict:
         "material": lot_material_code(lot),
         "title": lot.title,
         "binId": lot.source_compartment.smart_bin_id if lot.source_compartment else "",
+        "dustbinId": lot.dustbin_id or "",
+        "dustbinLabel": lot.dustbin.name if lot.dustbin else "",
         "quantityKg": as_float(lot.estimated_weight_kg),
         "totalWeightKg": as_float(lot.estimated_weight_kg),
         "weightUnit": "kg",
@@ -526,6 +545,7 @@ def owner_snapshot(user: User) -> dict:
     points = CollectionPoint.query.filter_by(owner_id=user.id, is_active=True).all()
     point_ids = [point.id for point in points]
     bins = SmartBin.query.filter(SmartBin.collection_point_id.in_(point_ids)).all() if point_ids else []
+    dustbins = Dustbin.query.filter_by(owner_id=user.id).order_by(Dustbin.created_at.desc()).all()
     lots = PlasticLot.query.filter_by(owner_id=user.id).order_by(PlasticLot.created_at.desc()).all()
     offers = CollectorOffer.query.join(PlasticLot).filter(PlasticLot.owner_id == user.id).order_by(CollectorOffer.created_at.desc()).all()
     pickups = Pickup.query.filter_by(owner_id=user.id).order_by(Pickup.created_at.desc()).all()
@@ -548,6 +568,7 @@ def owner_snapshot(user: User) -> dict:
         "user": owner_user(user),
         "collectionPoints": [collection_point_for_owner(point) for point in points],
         "smartBins": [bin_for_owner(smart_bin) for smart_bin in bins],
+        "dustbins": [dustbin_for_owner(dustbin) for dustbin in dustbins],
         "lots": [lot_for_owner(lot) for lot in lots],
         "offers": [offer_for_owner(offer) for offer in offers],
         "pickups": [pickup_for_owner(pickup) for pickup in pickups],

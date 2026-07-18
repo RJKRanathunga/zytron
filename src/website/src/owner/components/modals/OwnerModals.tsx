@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { MaterialBadge } from '../common/MaterialBadge'
 import { Modal } from './Modal'
-import type { CollectorOffer, LotPlasticItem, PlasticLot, PlasticMaterial, SmartBin } from '../../types/domain'
+import type { CollectorOffer, Dustbin, LotPlasticItem, PlasticLot, PlasticMaterial, SmartBin } from '../../types/domain'
 import { formatCurrency, formatKg } from '../../utils/format'
 import { plasticMaterialLabel } from '../../../config/plasticMaterials'
 
@@ -10,9 +10,10 @@ interface OwnerModalsProps {
   scheduleOffer: CollectorOffer | null
   editLot: PlasticLot | null
   lots: PlasticLot[]
+  dustbins: Dustbin[]
   isPublishOpen: boolean
   onClose: () => void
-  onPublish: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => void
+  onPublish: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[], dustbinId?: string) => void
   onUpdateLot: (lotId: string, pricePerKg: number, plasticItems: LotPlasticItem[]) => void
   onSchedule: (offerId: string, pickupDate: string, timeWindow: string) => void
 }
@@ -22,6 +23,7 @@ export function OwnerModals({
   scheduleOffer,
   editLot,
   lots,
+  dustbins,
   isPublishOpen,
   onClose,
   onPublish,
@@ -33,6 +35,7 @@ export function OwnerModals({
   const [publishWeights, setPublishWeights] = useState<Record<string, string>>({})
   const [publishIncluded, setPublishIncluded] = useState<Record<string, boolean>>({})
   const [publishErrors, setPublishErrors] = useState<Record<string, string>>({})
+  const [publishDustbinId, setPublishDustbinId] = useState('')
   const [editPriceValues, setEditPriceValues] = useState<Record<string, string>>({})
   const [editWeightValues, setEditWeightValues] = useState<Record<string, string>>({})
   const [removedEditItems, setRemovedEditItems] = useState<string[]>([])
@@ -137,6 +140,7 @@ export function OwnerModals({
                   weight: item.weight,
                   weightUnit: item.weightUnit,
                 })),
+                publishDustbinId || undefined,
               )
             }}
           >
@@ -185,6 +189,19 @@ export function OwnerModals({
               ))}
               {publishErrors.form ? <small className="field-error">{publishErrors.form}</small> : null}
             </div>
+            <label className="field">
+              <span>Registered dustbin</span>
+              <select value={publishDustbinId} onChange={(event) => setPublishDustbinId(event.target.value)}>
+                <option value="">No registered dustbin</option>
+                {dustbins
+                  .filter((dustbin) => dustbin.isActive)
+                  .map((dustbin) => (
+                    <option key={dustbin.id} value={dustbin.id}>
+                      {dustbin.name} - {dustbin.code}
+                    </option>
+                  ))}
+              </select>
+            </label>
             <label className="field">
               <span>Minimum price per kilogram</span>
               <input min="1" required type="number" value={price} onChange={(event) => setPrice(event.target.value)} />
