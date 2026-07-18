@@ -1,6 +1,6 @@
 import { apiRequest } from '../../services/apiClient'
 import { authService } from '../../auth/authService'
-import type { OwnerSnapshot } from '../types/domain'
+import type { LotPlasticItem, OwnerSnapshot } from '../types/domain'
 import type { CheckoutSession, SellerBilling, SellerPackage } from '../types/domain'
 
 export interface OwnerService {
@@ -9,7 +9,8 @@ export interface OwnerService {
   loadSnapshot: () => Promise<OwnerSnapshot>
   loadPackages: () => Promise<SellerPackage[]>
   loadBilling: () => Promise<SellerBilling>
-  publishLot: (binId: string, pricePerKg: number, pickupWindow: string) => Promise<OwnerSnapshot>
+  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => Promise<OwnerSnapshot>
+  updateLot: (lotId: string, input: LotUpdateInput) => Promise<OwnerSnapshot>
   createSubscriptionCheckout: () => Promise<CheckoutSession>
   cancelSubscription: () => Promise<SellerBilling>
   createListingPaymentCheckout: (lotId: string) => Promise<CheckoutSession>
@@ -34,6 +35,11 @@ export interface OwnerProfileUpdate {
   phone: string
 }
 
+export interface LotUpdateInput {
+  pricePerKg: number
+  plasticItems: LotPlasticItem[]
+}
+
 async function reloadSnapshot(): Promise<OwnerSnapshot> {
   return apiRequest<OwnerSnapshot>('/dashboard/owner')
 }
@@ -49,10 +55,18 @@ export const ownerService: OwnerService = {
 
   loadBilling: () => apiRequest<SellerBilling>('/seller/billing'),
 
-  publishLot: async (binId, pricePerKg, pickupWindow) => {
+  publishLot: async (binId, pricePerKg, pickupWindow, plasticItems) => {
     await apiRequest('/lots', {
       method: 'POST',
-      body: JSON.stringify({ binId, pricePerKg, pickupWindow }),
+      body: JSON.stringify({ binId, pricePerKg, pickupWindow, plasticItems }),
+    })
+    return reloadSnapshot()
+  },
+
+  updateLot: async (lotId, input) => {
+    await apiRequest(`/lots/${lotId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
     })
     return reloadSnapshot()
   },

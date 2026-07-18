@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import or_
+
 from app.models import (
     BinCompartment,
     CollectionPoint,
@@ -152,6 +154,37 @@ def owner_lot_status(lot: PlasticLot) -> str:
     return "draft"
 
 
+def plastic_item_record(item) -> dict:
+    return {
+        "id": item.id,
+        "plasticType": item.plastic_type,
+        "customPlasticType": item.custom_plastic_type,
+        "weight": as_float(item.weight),
+        "weightUnit": item.weight_unit,
+    }
+
+
+def lot_plastic_breakdown(lot: PlasticLot) -> list[dict]:
+    if lot.plastic_items:
+        return [plastic_item_record(item) for item in lot.plastic_items]
+    return [
+        {
+            "id": f"{lot.id}-legacy-material",
+            "plasticType": lot.material.code,
+            "customPlasticType": None,
+            "weight": as_float(lot.estimated_weight_kg),
+            "weightUnit": "kg",
+        }
+    ]
+
+
+def lot_material_code(lot: PlasticLot) -> str:
+    items = lot_plastic_breakdown(lot)
+    if len(items) == 1 and items[0]["plasticType"] != "Other":
+        return items[0]["plasticType"]
+    return "MIXED"
+
+
 def owner_offer_status(offer: CollectorOffer) -> str:
     return {"pending": "new", "accepted": "accepted", "rejected": "rejected"}.get(offer.status, "new")
 
@@ -220,10 +253,13 @@ def lot_for_collector(lot: PlasticLot) -> dict:
     point = lot.collection_point
     return {
         "id": lot.id,
-        "material": lot.material.code,
+        "material": lot_material_code(lot),
         "title": lot.title,
         "collectionPointId": lot.collection_point_id,
         "quantityKg": as_float(lot.estimated_weight_kg),
+        "totalWeightKg": as_float(lot.estimated_weight_kg),
+        "weightUnit": "kg",
+        "plasticItems": lot_plastic_breakdown(lot),
         "pricePerKg": as_float(lot.price_per_kg),
         "status": collector_lot_status(lot),
         "fillLevel": int(lot.fill_level),
@@ -243,10 +279,15 @@ def lot_for_collector(lot: PlasticLot) -> dict:
 def lot_for_owner(lot: PlasticLot) -> dict:
     return {
         "id": lot.id,
-        "material": lot.material.code,
+        "material": lot_material_code(lot),
+        "title": lot.title,
         "binId": lot.source_compartment.smart_bin_id if lot.source_compartment else "",
         "quantityKg": as_float(lot.estimated_weight_kg),
+        "totalWeightKg": as_float(lot.estimated_weight_kg),
+        "weightUnit": "kg",
+        "plasticItems": lot_plastic_breakdown(lot),
         "pricePerKg": as_float(lot.price_per_kg),
+        "qualityGrade": lot.quality_grade,
         "status": owner_lot_status(lot),
         "pickupWindow": lot.availability_start.strftime("%a %d %b, 9:00 AM-12:00 PM") if lot.availability_start else "Flexible pickup",
         "publishedAt": "Just now" if not lot.published_at else lot.published_at.strftime("%a %d %b"),
@@ -407,11 +448,17 @@ def demand_alert_for_collector(alert: DemandAlert) -> dict:
 def demand_alert_match_count(alert: DemandAlert) -> int:
     query = PlasticLot.query.filter(PlasticLot.status.in_(["available", "published"]))
     if alert.material_id:
-        query = query.filter(PlasticLot.material_id == alert.material_id)
+        query = query.filter(or_(PlasticLot.material_id == alert.material_id, PlasticLot.plastic_items.any(plastic_type=alert.material.code)))
     if alert.maximum_price_per_kg:
         query = query.filter(PlasticLot.price_per_kg <= alert.maximum_price_per_kg)
-    query = query.filter(PlasticLot.estimated_weight_kg >= alert.minimum_weight_kg)
-    return query.count()
+    matches = 0
+    for lot in query.all():
+        candidate_weight = sum((item.weight for item in lot.plastic_items if not alert.material_id or item.plastic_type == alert.material.code), Decimal("0"))
+        if candidate_weight <= 0:
+            candidate_weight = lot.estimated_weight_kg
+        if candidate_weight >= alert.minimum_weight_kg:
+            matches += 1
+    return matches
 
 
 def collector_user(user: User) -> dict:
@@ -492,7 +539,7 @@ def owner_snapshot(user: User) -> dict:
     completed = Pickup.query.filter_by(owner_id=user.id, status="completed").count()
     impact = [
         {"id": "items", "label": "Items redirected", "value": "3,170", "detail": "Estimated items kept in the loop this month"},
-        {"id": "plastic", "label": "Plastic captured", "value": f"{total_plastic:.1f} kg", "detail": "Measured by smart-bin weight sensors"},
+        {"id": "plastic", "label": "Plastic captured", "value": f"{total_plastic:.1f} kg", "detail": "Tracked from inventory and completed handovers"},
         {"id": "co2", "label": "CO2e avoided", "value": f"{round(total_plastic * 1.72)} kg", "detail": "Estimated from recovered plastic weight"},
         {"id": "community", "label": "Completed pickups", "value": str(completed), "detail": "Verified handovers this month"},
     ]

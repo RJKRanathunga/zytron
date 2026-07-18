@@ -4,6 +4,7 @@ import { StatusBadge } from '../components/common/StatusBadge'
 import { SupplyMap } from '../components/maps/SupplyMap'
 import { useCollectorApp } from '../hooks/useCollectorApp'
 import { formatCurrency, formatKg, getLotValue, getPointForLot } from '../utils/format'
+import { plasticMaterialLabel } from '../../config/plasticMaterials'
 
 export function LotDetails() {
   const { lotId } = useParams()
@@ -40,7 +41,7 @@ export function LotDetails() {
           <h2>{lot.qualityGrade}</h2>
           <div className="summary-grid wide">
             <div>
-              <small>Quantity</small>
+              <small>Total weight</small>
               <strong>{formatKg(lot.quantityKg)}</strong>
             </div>
             <div>
@@ -55,6 +56,15 @@ export function LotDetails() {
               <small>Demand score</small>
               <strong>{lot.demandScore}%</strong>
             </div>
+          </div>
+          <div className="breakdown-panel">
+            <strong>Plastic breakdown</strong>
+            {lot.plasticItems.map((item) => (
+              <span key={`${item.plasticType}-${item.customPlasticType ?? ''}`}>
+                <b>{plasticMaterialLabel(item.plasticType, item.customPlasticType)}</b>
+                {formatKg(item.weight)}
+              </span>
+            ))}
           </div>
           <div className="detail-list">
             <span>

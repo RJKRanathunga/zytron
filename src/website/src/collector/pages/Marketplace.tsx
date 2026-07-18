@@ -6,8 +6,9 @@ import { SegmentedControl } from '../components/common/SegmentedControl'
 import { useCollectorApp } from '../hooks/useCollectorApp'
 import type { CollectorSortMode, MaterialFilter } from '../types/domain'
 import { getLotValue, getPointForLot } from '../utils/format'
+import { MATERIAL_FILTER_OPTIONS } from '../../config/plasticMaterials'
 
-const materialOptions: readonly MaterialFilter[] = ['All', 'PP', 'PET', 'HDPE', 'LDPE']
+const materialOptions = MATERIAL_FILTER_OPTIONS satisfies readonly MaterialFilter[]
 const sortOptions: readonly CollectorSortMode[] = ['recommended', 'distance', 'price', 'quantity']
 
 export function Marketplace() {
@@ -23,7 +24,8 @@ export function Marketplace() {
       .filter((lot) => activeMaterial === 'All' || lot.material === activeMaterial)
       .filter((lot) => {
         const point = getPointForLot(lot, app.points)
-        const searchable = `${lot.title} ${lot.material} ${point?.name ?? ''} ${point?.district ?? ''}`.toLowerCase()
+          const materialText = lot.plasticItems.map((item) => item.plasticType).join(' ')
+          const searchable = `${lot.title} ${lot.material} ${materialText} ${point?.name ?? ''} ${point?.district ?? ''}`.toLowerCase()
         return normalizedQuery.length === 0 || searchable.includes(normalizedQuery)
       })
       .sort((first, second) => {

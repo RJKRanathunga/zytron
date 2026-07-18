@@ -1,4 +1,6 @@
-export type PlasticMaterial = 'PP' | 'PET' | 'HDPE' | 'LDPE'
+import type { PlasticMaterial } from '../../config/plasticMaterials'
+
+export type { PlasticMaterial }
 
 export type MaterialFilter = PlasticMaterial | 'All'
 
@@ -59,9 +61,14 @@ export interface SmartBin {
 export interface PlasticLot {
   id: string
   material: PlasticMaterial
+  title: string
   binId: string
   quantityKg: number
+  totalWeightKg: number
+  weightUnit: 'kg'
+  plasticItems: LotPlasticItem[]
   pricePerKg: number
+  qualityGrade: string
   status: LotStatus
   pickupWindow: string
   publishedAt: string
@@ -69,6 +76,14 @@ export interface PlasticLot {
   paymentRequired?: boolean
   publicationSource?: 'pro_subscription' | 'flex_payment' | 'admin' | null
   expiresAt?: string | null
+}
+
+export interface LotPlasticItem {
+  id?: string
+  plasticType: PlasticMaterial | 'Other'
+  customPlasticType?: string | null
+  weight: number
+  weightUnit: 'kg'
 }
 
 export interface SellerPackage {

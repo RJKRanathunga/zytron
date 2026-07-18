@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from flask import Blueprint
 
+from sqlalchemy import or_
+
 from app.errors import ResourceNotFound
-from app.models import DemandAlert, PlasticLot
+from app.models import DemandAlert, LotPlasticItem, PlasticLot
 from app.permissions import current_user
 from app.routes.helpers import data_response, load_payload, paginated_response
 from app.schemas import DemandAlertSchema
@@ -75,8 +79,18 @@ def alert_matches(alert_id: str):
         raise ResourceNotFound("The requested demand alert was not found.")
     query = PlasticLot.query.filter(PlasticLot.status.in_(["available", "published"]))
     if alert.material_id:
-        query = query.filter(PlasticLot.material_id == alert.material_id)
+        query = query.filter(or_(PlasticLot.material_id == alert.material_id, PlasticLot.plastic_items.any(LotPlasticItem.plastic_type == alert.material.code)))
     if alert.maximum_price_per_kg:
         query = query.filter(PlasticLot.price_per_kg <= alert.maximum_price_per_kg)
-    query = query.filter(PlasticLot.estimated_weight_kg >= alert.minimum_weight_kg)
-    return data_response([lot_for_collector(lot) for lot in query.all()])
+    if not alert.material_id:
+        query = query.filter(PlasticLot.estimated_weight_kg >= alert.minimum_weight_kg)
+        return data_response([lot_for_collector(lot) for lot in query.all()])
+
+    matches = []
+    for lot in query.all():
+        material_weight = sum((item.weight for item in lot.plastic_items if item.plastic_type == alert.material.code), Decimal("0"))
+        if material_weight <= 0 and lot.material_id == alert.material_id:
+            material_weight = lot.estimated_weight_kg
+        if material_weight >= alert.minimum_weight_kg:
+            matches.append(lot_for_collector(lot))
+    return data_response(matches)

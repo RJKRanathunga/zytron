@@ -39,8 +39,8 @@ export function Dashboard() {
           <span className="hero-badge">Priority action</span>
           <h2>Your PP bin is full and three collectors are ready to buy.</h2>
           <p>
-            Publish the 28.4 kg lot or compare current offers. The strongest offer is {formatCurrency(bestOffer?.price ?? 0)}
-            with pickup available tomorrow morning.
+            Enter the PP lot weight manually before publishing or compare current offers. The strongest offer is{' '}
+            {formatCurrency(bestOffer?.price ?? 0)} with pickup available tomorrow morning.
           </p>
           <div className="hero-actions">
             <button className="btn light" type="button" onClick={() => app.openPublishModal('bin-a-03')}>
@@ -72,8 +72,8 @@ export function Dashboard() {
             </span>
           </div>
           <div className="floating f1">
-            <strong>28.4 kg</strong>
-            <small>ready for collection</small>
+            <strong>Manual kg</strong>
+            <small>required to publish</small>
           </div>
           <div className="floating f2">
             <strong>{formatCurrency(bestOffer?.price ?? 0)}</strong>

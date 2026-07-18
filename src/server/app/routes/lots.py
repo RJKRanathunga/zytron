@@ -3,10 +3,11 @@ from __future__ import annotations
 from decimal import Decimal
 
 from flask import Blueprint, request
+from sqlalchemy import or_
 
 from app.errors import ApiError, ResourceNotFound
 from app.extensions import db
-from app.models import CollectionPoint, PlasticLot
+from app.models import CollectionPoint, LotPlasticItem, PlasticLot
 from app.permissions import current_user
 from app.routes.helpers import data_response, load_payload, paginated_response
 from app.schemas import PublishLotSchema
@@ -18,10 +19,11 @@ from app.services.workflows import (
     ensure_lot_owner,
     ensure_owner,
     get_or_404,
-    material_from_code_or_id,
     notify_matching_demand_alerts,
     positive_decimal,
     publish_lot,
+    replace_lot_plastic_items,
+    validate_lot_plastic_items,
     withdraw_lot,
 )
 
@@ -49,7 +51,8 @@ def list_lots():
             query = query.filter(PlasticLot.status == status)
     material = request.args.get("material")
     if material and material != "All":
-        query = query.join(PlasticLot.material).filter_by(code=material.upper())
+        code = material.upper()
+        query = query.filter(or_(PlasticLot.material.has(code=code), PlasticLot.plastic_items.any(LotPlasticItem.plastic_type == code)))
     collection_point_id = request.args.get("collection_point_id")
     if collection_point_id:
         query = query.filter_by(collection_point_id=collection_point_id)
@@ -77,22 +80,21 @@ def create_lot():
         point = get_or_404(CollectionPoint, payload.get("collection_point_id", ""), "The requested collection point was not found.")
         if point.owner_id != user.id:
             raise ResourceNotFound("The requested collection point was not found.")
-        material = material_from_code_or_id(payload.get("material") or payload.get("material_id"))
-        if not material:
-            raise ApiError("validation_error", "A valid material is required.", 400)
+        plastic_items, total_weight, material = validate_lot_plastic_items(payload)
         lot = PlasticLot(
             owner=user,
             collection_point=point,
             material=material,
             title=payload.get("title") or f"Draft {material.code} lot",
             description=payload.get("description") or "",
-            estimated_weight_kg=positive_decimal(payload.get("quantity_kg"), "quantity_kg"),
+            estimated_weight_kg=total_weight,
             minimum_weight_kg=Decimal("1"),
             price_per_kg=positive_decimal(payload.get("pricePerKg") or payload.get("price_per_kg"), "pricePerKg"),
             status="draft",
             payment_required=True,
         )
         db.session.add(lot)
+        replace_lot_plastic_items(lot, plastic_items)
         db.session.commit()
         return data_response(lot_for_owner(lot), 201)
     lot = publish_lot(user, payload)
@@ -119,8 +121,11 @@ def update_lot(lot_id: str):
     payload = request.get_json() or {}
     if payload.get("pricePerKg") is not None or payload.get("price_per_kg") is not None:
         lot.price_per_kg = positive_decimal(payload.get("pricePerKg") or payload.get("price_per_kg"), "pricePerKg")
-    if payload.get("quantityKg") is not None or payload.get("quantity_kg") is not None:
-        lot.estimated_weight_kg = positive_decimal(payload.get("quantityKg") or payload.get("quantity_kg"), "quantityKg")
+    if payload.get("plasticItems") is not None or payload.get("plastic_items") is not None or payload.get("quantityKg") is not None or payload.get("quantity_kg") is not None:
+        plastic_items, total_weight, material = validate_lot_plastic_items(payload)
+        lot.material = material
+        lot.estimated_weight_kg = total_weight
+        replace_lot_plastic_items(lot, plastic_items)
     for key in ["title", "description", "quality_grade"]:
         if key in payload:
             setattr(lot, key, payload[key])

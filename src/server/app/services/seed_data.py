@@ -19,6 +19,7 @@ from app.models import (
     Organization,
     Package,
     SellerSubscription,
+    LotPlasticItem,
     Pickup,
     PlasticLot,
     PlasticMaterial,
@@ -322,7 +323,7 @@ def seed_database():
         ("lot-uom-pp-reserved", "point-uom", "mat-pp", "comp-b01-pp", "17.8 kg Polypropylene", Decimal("17.8"), Decimal("102"), "reserved", "Reserved PP stream", 74, 80, 11),
     ]
     for lot_id, point_id, mat_id, comp_id, title, weight, price, status, grade, fill, score, views in lot_rows:
-        upsert(
+        lot = upsert(
             PlasticLot,
             lot_id,
             owner=owner,
@@ -344,6 +345,15 @@ def seed_database():
             demand_score=score,
             views=views,
             availability_start=now,
+        )
+        upsert(
+            LotPlasticItem,
+            f"lotitem-{lot_id}",
+            lot=lot,
+            plastic_type=lot.material.code,
+            custom_plastic_type=None,
+            weight=weight,
+            weight_unit="kg",
         )
 
     offer_rows = [

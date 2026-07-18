@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { MaterialBadge } from '../common/MaterialBadge'
 import { StatusBadge } from '../common/StatusBadge'
 import type { CollectionPoint, PlasticLot } from '../../types/domain'
-import { formatCurrency, formatKg, getLotValue } from '../../utils/format'
+import { formatCurrency, formatKg, formatPlasticBreakdown, getLotValue } from '../../utils/format'
 
 interface LotCardProps {
   lot: PlasticLot
@@ -43,6 +43,10 @@ export function LotCard({
         {lot.tags.map((tag) => (
           <span key={tag}>{tag}</span>
         ))}
+      </div>
+      <div className="breakdown-line">
+        <strong>Plastic breakdown</strong>
+        <span>{formatPlasticBreakdown(lot)}</span>
       </div>
       <div className="lot-bottom">
         <span className="supplier">

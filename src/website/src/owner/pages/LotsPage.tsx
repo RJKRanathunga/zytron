@@ -25,6 +25,7 @@ export function LotsPage() {
             key={lot.id}
             lot={lot}
             bin={getBinForLot(lot, app.smartBins)}
+            onEdit={app.openEditLotModal}
             onStartPayment={app.startListingPayment}
             onWithdraw={app.withdrawLot}
           />

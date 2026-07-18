@@ -3,7 +3,7 @@ import { calculateRoute, type RouteEstimate } from '../../../maps/mapService'
 import { isValidLatLng } from '../../../maps/googleMaps'
 import { useBrowserLocation } from '../../../maps/useBrowserLocation'
 import type { CollectionPoint, PlasticLot } from '../../types/domain'
-import { formatCurrency, formatKg, getLotValue, getPointForLot } from '../../utils/format'
+import { formatCurrency, formatKg, formatPlasticBreakdown, getLotValue, getPointForLot } from '../../utils/format'
 
 interface RouteSummaryCardProps {
   lots: PlasticLot[]
@@ -89,7 +89,7 @@ export function RouteSummaryCard({
               <span>
                 <strong>{point?.name ?? lot.title}</strong>
                 <small>
-                  {lot.pickupWindow} - {formatKg(lot.quantityKg)} {lot.material}
+                  {lot.pickupWindow} - {formatPlasticBreakdown(lot)}
                 </small>
               </span>
               <button

@@ -19,6 +19,7 @@ from app.models import (
     MessageThread,
     Notification,
     Pickup,
+    LotPlasticItem,
     PlasticLot,
     PlasticMaterial,
     Reservation,
@@ -73,6 +74,138 @@ def material_from_code_or_id(value: str | None) -> PlasticMaterial | None:
     return PlasticMaterial.query.filter(
         (PlasticMaterial.id == value) | (PlasticMaterial.code == value.upper())
     ).first()
+
+
+def _field_error(field_name: str, message: str) -> ApiError:
+    return ApiError("validation_error", message, 400, {field_name: [message]})
+
+
+def _decimal_places(number: Decimal) -> int:
+    exponent = number.normalize().as_tuple().exponent
+    return abs(exponent) if exponent < 0 else 0
+
+
+def decimal_display(number: Decimal) -> str:
+    text = format(number.normalize(), "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def _lot_item_rows(payload: dict) -> list[dict]:
+    rows = payload.get("plasticItems")
+    if rows is None:
+        rows = payload.get("plastic_items")
+    if rows is not None:
+        return rows
+
+    quantity = payload.get("quantity_kg")
+    if quantity is None:
+        quantity = payload.get("quantityKg")
+    material = payload.get("material") or payload.get("material_id")
+    if quantity is not None and material:
+        return [{"plasticType": material, "weight": quantity, "weightUnit": "kg"}]
+    return []
+
+
+def validate_lot_plastic_items(payload: dict, allowed_material_codes: set[str] | None = None) -> tuple[list[dict], Decimal, PlasticMaterial]:
+    rows = _lot_item_rows(payload)
+    if not rows:
+        raise ApiError(
+            "validation_error",
+            "At least one plastic type with a manually entered weight is required.",
+            400,
+            {"plasticItems": ["At least one plastic type is required."]},
+        )
+    if not isinstance(rows, list):
+        raise _field_error("plasticItems", "Plastic items must be a list.")
+
+    normalized: list[dict] = []
+    seen: set[str] = set()
+    total = Decimal("0")
+
+    for index, row in enumerate(rows):
+        field = f"plasticItems.{index}"
+        if not isinstance(row, dict):
+            raise _field_error(field, "Plastic item must be an object.")
+
+        raw_type = (row.get("plasticType") or row.get("plastic_type") or "").strip()
+        custom_type = (row.get("customPlasticType") or row.get("custom_plastic_type") or "").strip()
+        if not raw_type:
+            raise _field_error(f"{field}.plasticType", "Plastic type is required.")
+
+        material = material_from_code_or_id(raw_type)
+        plastic_type = material.code if material else raw_type.upper()
+        if not material and plastic_type in {"OTHER", "OTHER PLASTIC"}:
+            plastic_type = "Other"
+            if not custom_type:
+                raise _field_error(f"{field}.customPlasticType", "Custom plastic type is required for Other.")
+        elif not material:
+            raise _field_error(f"{field}.plasticType", "Plastic type must be one of the supported platform classifications.")
+
+        if allowed_material_codes is not None and plastic_type not in allowed_material_codes:
+            raise _field_error(f"{field}.plasticType", "Plastic type is not available in the selected bin.")
+
+        duplicate_key = plastic_type.lower()
+        if duplicate_key in seen:
+            raise _field_error(f"{field}.plasticType", "Duplicate plastic types are not allowed in the same lot.")
+        seen.add(duplicate_key)
+
+        unit = (row.get("weightUnit") or row.get("weight_unit") or "kg").strip().lower()
+        if unit != "kg":
+            raise _field_error(f"{field}.weightUnit", "Weight unit must be kg.")
+
+        weight = decimal_value(row.get("weight"))
+        if weight is None or weight <= 0:
+            raise _field_error(f"{field}.weight", "Weight must be greater than zero.")
+        if _decimal_places(weight) > 2:
+            raise _field_error(f"{field}.weight", "Weight supports up to 2 decimal places.")
+
+        weight = weight.quantize(Decimal("0.01"))
+        total += weight
+        normalized.append(
+            {
+                "plastic_type": plastic_type,
+                "custom_plastic_type": custom_type if plastic_type == "Other" else None,
+                "weight": weight,
+                "weight_unit": "kg",
+                "material": material,
+            }
+        )
+
+    primary_material = next((item["material"] for item in normalized if item["material"]), None)
+    if not primary_material:
+        primary_material = material_from_code_or_id("MIXED")
+    if not primary_material:
+        raise _field_error("plasticItems", "At least one supported platform plastic type is required.")
+
+    return normalized, total, primary_material
+
+
+def replace_lot_plastic_items(lot: PlasticLot, items: list[dict]) -> None:
+    lot.plastic_items[:] = []
+    for item in items:
+        lot.plastic_items.append(
+            LotPlasticItem(
+                plastic_type=item["plastic_type"],
+                custom_plastic_type=item["custom_plastic_type"],
+                weight=item["weight"],
+                weight_unit=item["weight_unit"],
+            )
+        )
+
+
+def lot_has_material(lot: PlasticLot, material_code: str) -> bool:
+    code = material_code.upper()
+    if lot.material and lot.material.code == code:
+        return True
+    return any(item.plastic_type.upper() == code for item in lot.plastic_items)
+
+
+def lot_weight_for_material(lot: PlasticLot, material_code: str) -> Decimal:
+    code = material_code.upper()
+    weight = sum((item.weight for item in lot.plastic_items if item.plastic_type.upper() == code), Decimal("0"))
+    if weight > 0:
+        return weight
+    return lot.estimated_weight_kg if lot.material and lot.material.code == code else Decimal("0")
 
 
 def ensure_collector(user: User):
@@ -357,24 +490,25 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     compartment_id = payload.get("compartmentId") or payload.get("compartment_id")
     compartment: BinCompartment | None = None
     point: CollectionPoint | None = None
+    allowed_material_codes: set[str] | None = None
 
     if compartment_id:
         compartment = get_or_404(BinCompartment, compartment_id, "The requested compartment was not found.")
         point = compartment.smart_bin.collection_point
+        allowed_material_codes = {compartment.material.code}
     elif bin_id:
         smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
         point = smart_bin.collection_point
         compartment = (
-            BinCompartment.query.filter_by(smart_bin_id=smart_bin.id, status="ready").order_by(BinCompartment.current_weight_kg.desc()).first()
-            or BinCompartment.query.filter_by(smart_bin_id=smart_bin.id).order_by(BinCompartment.current_weight_kg.desc()).first()
+            BinCompartment.query.filter_by(smart_bin_id=smart_bin.id, status="ready").order_by(BinCompartment.id.asc()).first()
+            or BinCompartment.query.filter_by(smart_bin_id=smart_bin.id).order_by(BinCompartment.id.asc()).first()
         )
+        allowed_material_codes = {item.material.code for item in smart_bin.compartments if item.material}
     elif payload.get("collection_point_id"):
         point = get_or_404(CollectionPoint, payload["collection_point_id"], "The requested collection point was not found.")
 
     if not point or point.owner_id != user.id:
         raise ResourceNotFound("The requested collection inventory was not found.")
-    if compartment and compartment.current_weight_kg <= 0:
-        raise ApiError("insufficient_inventory", "This compartment does not have plastic to publish.", 400)
 
     existing_active = None
     if compartment:
@@ -385,22 +519,12 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     if existing_active:
         raise Conflict("inventory_already_published", "This compartment already has an active lot.")
 
-    material = material_from_code_or_id(payload.get("material_id") or payload.get("material"))
-    if not material and compartment:
-        material = compartment.material
-    if not material:
-        raise ApiError("validation_error", "A valid material is required.", 400, {"material": ["Unknown material."]})
-
-    quantity = decimal_value(payload.get("quantity_kg"), compartment.current_weight_kg if compartment else None)
-    if quantity is None:
-        raise ApiError("validation_error", "A positive quantity is required.", 400, {"quantity_kg": ["Missing data for required field."]})
-    quantity = positive_decimal(quantity, "quantity_kg")
+    plastic_items, quantity, material = validate_lot_plastic_items(payload, allowed_material_codes)
     price = positive_decimal(payload.get("pricePerKg") or payload.get("price_per_kg"), "pricePerKg")
-    if compartment and quantity > compartment.current_weight_kg:
-        raise ApiError("insufficient_inventory", "Published weight cannot exceed available compartment weight.", 400)
 
     pickup_window = payload.get("pickupWindow") or payload.get("pickup_window") or "Flexible pickup"
-    title = payload.get("title") or f"{quantity.normalize()} kg {material.code}"
+    breakdown_label = ", ".join(f"{item['plastic_type']} {decimal_display(item['weight'])} kg" for item in plastic_items)
+    title = payload.get("title") or (f"{decimal_display(quantity)} kg {material.code}" if len(plastic_items) == 1 else f"{decimal_display(quantity)} kg mixed plastic lot")
     lot = PlasticLot(
         owner=user,
         collection_point=point,
@@ -418,9 +542,11 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
         fill_level=int(min(100, max(0, as_float(compartment.fill_percentage) if compartment else 80))),
         demand_score=90,
     )
+    lot.description = f"{lot.description}\nPlastic breakdown: {breakdown_label}" if breakdown_label else lot.description
     if pickup_window:
         lot.description = f"{lot.description}\nPickup window: {pickup_window}"
     db.session.add(lot)
+    replace_lot_plastic_items(lot, plastic_items)
     if compartment:
         compartment.status = "reserved"
     db.session.flush()
@@ -443,9 +569,10 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
 def notify_matching_demand_alerts(lot: PlasticLot):
     query = DemandAlert.query.filter_by(is_active=True)
     for alert in query:
-        if alert.material_id and alert.material_id != lot.material_id:
+        if alert.material_id and not lot_has_material(lot, alert.material.code):
             continue
-        if lot.estimated_weight_kg < alert.minimum_weight_kg:
+        candidate_weight = lot_weight_for_material(lot, alert.material.code) if alert.material_id else lot.estimated_weight_kg
+        if candidate_weight < alert.minimum_weight_kg:
             continue
         if alert.maximum_price_per_kg and lot.price_per_kg > alert.maximum_price_per_kg:
             continue

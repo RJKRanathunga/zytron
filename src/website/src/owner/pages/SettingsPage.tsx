@@ -3,7 +3,7 @@ import { useOwnerApp } from '../hooks/useOwnerApp'
 
 export function SettingsPage() {
   const app = useOwnerApp()
-  const [autoPublish, setAutoPublish] = useState(false)
+  const [manualWeightReminder, setManualWeightReminder] = useState(true)
   const [offerNotifications, setOfferNotifications] = useState(true)
   const [deviceAlerts, setDeviceAlerts] = useState(true)
   const [accessWindow, setAccessWindow] = useState('8:00 AM-5:00 PM')
@@ -23,10 +23,10 @@ export function SettingsPage() {
           <div className="settings-list">
             <label className="toggle-row">
               <span>
-                <strong>Auto-publish ready lots</strong>
-                <small>Draft lots when compartments cross their threshold.</small>
+                <strong>Manual weight reminder</strong>
+                <small>Remind sellers to enter kg values before publishing a lot.</small>
               </span>
-              <input checked={autoPublish} type="checkbox" onChange={(event) => setAutoPublish(event.target.checked)} />
+              <input checked={manualWeightReminder} type="checkbox" onChange={(event) => setManualWeightReminder(event.target.checked)} />
             </label>
             <label className="toggle-row">
               <span>

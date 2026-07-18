@@ -1015,6 +1015,17 @@ a {
   color: #5b4cb5;
 }
 
+.symbol.pvc,
+.symbol.mixed {
+  background: #e7eeea;
+  color: #53645d;
+}
+
+.symbol.ps {
+  background: var(--coral-light);
+  color: #a64a42;
+}
+
 .route-symbol {
   background: var(--sun-light);
   color: #8a6800;
@@ -1400,6 +1411,27 @@ a {
   margin-top: 10px;
   color: var(--ink-soft);
   font-size: 8px;
+}
+
+.breakdown-line {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.breakdown-line strong {
+  color: var(--ink);
+  font-size: 8px;
+}
+
+.breakdown-line span {
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.5;
 }
 
 .route-card {
@@ -1945,6 +1977,76 @@ a {
   color: var(--ink);
   font-size: 10px;
   outline: 0;
+}
+
+.field-error {
+  display: block;
+  margin-top: 5px;
+  color: #a64a42;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.plastic-editor {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.plastic-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.75fr) auto;
+  align-items: start;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdfc;
+}
+
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 39px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.check-line input {
+  width: auto;
+  margin: 0;
+}
+
+.compact-field {
+  margin-bottom: 0;
+}
+
+.breakdown-panel {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdfc;
+}
+
+.breakdown-panel > strong {
+  font-size: 10px;
+}
+
+.breakdown-panel span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.breakdown-panel b {
+  color: var(--ink);
 }
 
 .auth-tabs {
@@ -2618,7 +2720,8 @@ td small {
 
   .summary-grid,
   .summary-grid.wide,
-  .form-grid {
+  .form-grid,
+  .plastic-row {
     grid-template-columns: 1fr;
   }
 

@@ -2,7 +2,7 @@ from app.models.billing import ListingPayment, Package, PaymentTransaction, Sell
 from app.models.collection_point import CollectionPoint
 from app.models.demand_alert import DemandAlert
 from app.models.impact import ImpactSnapshot
-from app.models.lot import CollectorOffer, PlasticLot, Reservation
+from app.models.lot import CollectorOffer, LotPlasticItem, PlasticLot, Reservation
 from app.models.material import PlasticMaterial
 from app.models.message import Message, MessageThread
 from app.models.notification import Notification
@@ -19,6 +19,7 @@ __all__ = [
     "DeviceAlert",
     "ImpactSnapshot",
     "ListingPayment",
+    "LotPlasticItem",
     "Message",
     "MessageThread",
     "Notification",

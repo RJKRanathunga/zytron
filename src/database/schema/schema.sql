@@ -140,6 +140,20 @@ CREATE TABLE plastic_lots (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+CREATE TABLE lot_plastic_items (
+  id VARCHAR(64) PRIMARY KEY,
+  lot_id VARCHAR(64) NOT NULL REFERENCES plastic_lots(id) ON DELETE CASCADE,
+  plastic_type VARCHAR(32) NOT NULL,
+  custom_plastic_type VARCHAR(120),
+  weight NUMERIC(10, 2) NOT NULL,
+  weight_unit VARCHAR(8) NOT NULL DEFAULT 'kg',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  CONSTRAINT ck_lot_plastic_items_weight_positive CHECK (weight > 0),
+  CONSTRAINT ck_lot_plastic_items_weight_unit CHECK (weight_unit IN ('kg')),
+  CONSTRAINT uq_lot_plastic_item_type UNIQUE (lot_id, plastic_type)
+);
+
 CREATE TABLE collector_offers (
   id VARCHAR(64) PRIMARY KEY,
   lot_id VARCHAR(64) NOT NULL REFERENCES plastic_lots(id),
@@ -330,6 +344,8 @@ CREATE INDEX ix_bin_compartments_smart_bin_id ON bin_compartments(smart_bin_id);
 CREATE INDEX ix_plastic_lots_owner_id ON plastic_lots(owner_id);
 CREATE INDEX ix_plastic_lots_status ON plastic_lots(status);
 CREATE INDEX ix_plastic_lots_material_id ON plastic_lots(material_id);
+CREATE INDEX ix_lot_plastic_items_lot_id ON lot_plastic_items(lot_id);
+CREATE INDEX ix_lot_plastic_items_plastic_type ON lot_plastic_items(plastic_type);
 CREATE INDEX ix_collector_offers_lot_id ON collector_offers(lot_id);
 CREATE INDEX ix_collector_offers_collector_id ON collector_offers(collector_id);
 CREATE INDEX ix_reservations_lot_id ON reservations(lot_id);

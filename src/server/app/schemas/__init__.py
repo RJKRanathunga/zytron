@@ -70,6 +70,16 @@ class RouteCalculationSchema(BaseSchema):
             raise ValidationError({"destinations": ["At least one destination is required."]})
 
 
+class LotPlasticItemSchema(BaseSchema):
+    plasticType = fields.String(data_key="plasticType", load_default=None, allow_none=True)
+    plastic_type = fields.String(load_default=None, allow_none=True)
+    customPlasticType = fields.String(data_key="customPlasticType", load_default="", allow_none=True, validate=validate.Length(max=120))
+    custom_plastic_type = fields.String(load_default="", allow_none=True, validate=validate.Length(max=120))
+    weight = fields.Decimal(required=True, as_string=False, allow_none=False)
+    weightUnit = fields.String(data_key="weightUnit", load_default="kg", validate=validate.OneOf(["kg"]))
+    weight_unit = fields.String(load_default="kg", validate=validate.OneOf(["kg"]))
+
+
 class PublishLotSchema(BaseSchema):
     status = fields.String(load_default=None, allow_none=True, validate=validate.OneOf(["draft", "available", "published", None]))
     binId = fields.String(data_key="binId", load_default=None, allow_none=True)
@@ -80,6 +90,8 @@ class PublishLotSchema(BaseSchema):
     material = fields.String(load_default=None, allow_none=True)
     material_id = fields.String(load_default=None, allow_none=True)
     quantity_kg = fields.Decimal(load_default=None, as_string=False, validate=validate.Range(min=0), allow_none=True)
+    plasticItems = fields.List(fields.Nested(LotPlasticItemSchema), data_key="plasticItems", load_default=None, allow_none=True)
+    plastic_items = fields.List(fields.Nested(LotPlasticItemSchema), load_default=None, allow_none=True)
     pricePerKg = fields.Decimal(data_key="pricePerKg", load_default=None, as_string=False, validate=validate.Range(min=0), allow_none=True)
     price_per_kg = fields.Decimal(load_default=None, as_string=False, validate=validate.Range(min=0), allow_none=True)
     pickupWindow = fields.String(data_key="pickupWindow", load_default="", validate=validate.Length(max=120))

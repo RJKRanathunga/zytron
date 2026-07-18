@@ -50,8 +50,7 @@ def test_publish_with_active_pro_and_buyer_access(client, owner_token, collector
         json={
             "status": "draft",
             "collection_point_id": "point-uom",
-            "material": "PP",
-            "quantity_kg": 10,
+            "plasticItems": [{"plasticType": "PP", "weight": 10, "weightUnit": "kg"}],
             "pricePerKg": 100,
             "title": "PRO publish lot",
         },
@@ -77,8 +76,7 @@ def test_block_publish_without_pro_then_publish_after_flex_payment(client, owner
         json={
             "status": "draft",
             "collection_point_id": "point-uom",
-            "material": "HDPE",
-            "quantity_kg": 8,
+            "plasticItems": [{"plasticType": "HDPE", "weight": 8, "weightUnit": "kg"}],
             "pricePerKg": 120,
             "title": "FLEX publish lot",
         },
@@ -112,8 +110,7 @@ def test_failed_flex_payment_preserves_draft(client, owner_token, auth_header, a
         json={
             "status": "draft",
             "collection_point_id": "point-uom",
-            "material": "PET",
-            "quantity_kg": 7,
+            "plasticItems": [{"plasticType": "PET", "weight": 7, "weightUnit": "kg"}],
             "pricePerKg": 90,
             "title": "Failed FLEX lot",
         },
@@ -137,8 +134,7 @@ def test_duplicate_flex_confirmation_is_idempotent(client, owner_token, auth_hea
         json={
             "status": "draft",
             "collection_point_id": "point-uom",
-            "material": "PP",
-            "quantity_kg": 6,
+            "plasticItems": [{"plasticType": "PP", "weight": 6, "weightUnit": "kg"}],
             "pricePerKg": 100,
             "title": "Duplicate payment lot",
         },

@@ -34,6 +34,7 @@ import type {
   OwnerUser,
   Pickup,
   PlasticLot,
+  LotPlasticItem,
   SmartBin,
   ToastMessage,
   Transaction,
@@ -63,6 +64,7 @@ function App() {
   const [isNotificationsOpen, setNotificationsOpen] = useState(false)
   const [publishBinId, setPublishBinId] = useState<string | null>(null)
   const [isPublishOpen, setPublishOpen] = useState(false)
+  const [editLotId, setEditLotId] = useState<string | null>(null)
   const [scheduleOfferId, setScheduleOfferId] = useState<string | null>(null)
 
   const applySnapshot = useCallback((snapshot: OwnerSnapshot) => {
@@ -133,19 +135,33 @@ function App() {
     setPublishOpen(true)
   }
 
-  const publishLot = (binId: string, pricePerKg: number, pickupWindow: string) => {
-    const bin = smartBins.find((item) => item.id === binId)
-    const compartment = bin?.compartments.find(
-      (item) => item.status === 'ready' || item.fillLevel >= item.thresholdLevel,
-    )
-    if (!bin || !compartment || Number.isNaN(pricePerKg) || pricePerKg <= 0) return
+  const plasticItemsTotal = (items: LotPlasticItem[]) => items.reduce((total, item) => total + item.weight, 0)
 
-    void mutate(() => ownerService.publishLot(binId, pricePerKg, pickupWindow), {
+  const publishLot = (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => {
+    const bin = smartBins.find((item) => item.id === binId)
+    const totalKg = plasticItemsTotal(plasticItems)
+    if (!bin || Number.isNaN(pricePerKg) || pricePerKg <= 0 || totalKg <= 0) return
+
+    void mutate(() => ownerService.publishLot(binId, pricePerKg, pickupWindow, plasticItems), {
       title: 'Listing submitted',
-      detail: `${formatKg(compartment.quantityKg)} ${compartment.material} will publish immediately with PRO or wait for FLEX payment.`,
+      detail: `${formatKg(totalKg)} manual plastic breakdown will publish immediately with PRO or wait for FLEX payment.`,
     })
     setPublishOpen(false)
     setPublishBinId(null)
+  }
+
+  const openEditLotModal = (lotId: string) => {
+    setEditLotId(lotId)
+  }
+
+  const updateLot = (lotId: string, pricePerKg: number, plasticItems: LotPlasticItem[]) => {
+    const totalKg = plasticItemsTotal(plasticItems)
+    if (Number.isNaN(pricePerKg) || pricePerKg <= 0 || totalKg <= 0) return
+    void mutate(() => ownerService.updateLot(lotId, { pricePerKg, plasticItems }), {
+      title: 'Lot weights updated',
+      detail: `${formatKg(totalKg)} is now the server-calculated total for this lot.`,
+    })
+    setEditLotId(null)
   }
 
   const startListingPayment = (lotId: string) => {
@@ -291,8 +307,10 @@ function App() {
     setNotificationsOpen,
     markNotificationRead,
     openPublishModal,
+    openEditLotModal,
     openScheduleModal,
     publishLot,
+    updateLot,
     startListingPayment,
     withdrawLot,
     acceptOffer,
@@ -305,6 +323,7 @@ function App() {
   }
 
   const publishBin = smartBins.find((bin) => bin.id === publishBinId) ?? null
+  const editLot = lots.find((lot) => lot.id === editLotId) ?? null
   const scheduleOffer = offers.find((offer) => offer.id === scheduleOfferId) ?? null
 
   return (
@@ -338,9 +357,12 @@ function App() {
         onClose={() => {
           setPublishOpen(false)
           setPublishBinId(null)
+          setEditLotId(null)
           setScheduleOfferId(null)
         }}
+        editLot={editLot}
         onPublish={publishLot}
+        onUpdateLot={updateLot}
         onSchedule={acceptOffer}
       />
     </>

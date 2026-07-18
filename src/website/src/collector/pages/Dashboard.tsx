@@ -10,8 +10,9 @@ import { SupplyMap } from '../components/maps/SupplyMap'
 import { useCollectorApp } from '../hooks/useCollectorApp'
 import type { MaterialFilter } from '../types/domain'
 import { formatCurrency, formatKg, getLotValue, getPointForLot } from '../utils/format'
+import { PLASTIC_MATERIAL_CODES } from '../../config/plasticMaterials'
 
-const materialOptions: readonly MaterialFilter[] = ['PP', 'PET', 'HDPE']
+const materialOptions = PLASTIC_MATERIAL_CODES.filter((material) => material !== 'MIXED') satisfies readonly MaterialFilter[]
 
 export function Dashboard() {
   const app = useCollectorApp()

@@ -3,8 +3,9 @@ import { EmptyState } from '../components/common/EmptyState'
 import { SegmentedControl } from '../components/common/SegmentedControl'
 import { useCollectorApp } from '../hooks/useCollectorApp'
 import type { MaterialFilter } from '../types/domain'
+import { MATERIAL_FILTER_OPTIONS } from '../../config/plasticMaterials'
 
-const materials: readonly MaterialFilter[] = ['PP', 'PET', 'HDPE', 'LDPE', 'All']
+const materials = MATERIAL_FILTER_OPTIONS satisfies readonly MaterialFilter[]
 
 export function DemandAlertsPage() {
   const app = useCollectorApp()

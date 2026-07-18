@@ -40,6 +40,30 @@ class PlasticLot(TimestampMixin, db.Model):
     reservations = db.relationship("Reservation", back_populates="lot")
     pickups = db.relationship("Pickup", back_populates="lot")
     listing_payments = db.relationship("ListingPayment", back_populates="listing")
+    plastic_items = db.relationship(
+        "LotPlasticItem",
+        back_populates="lot",
+        cascade="all, delete-orphan",
+        order_by="LotPlasticItem.created_at",
+    )
+
+
+class LotPlasticItem(TimestampMixin, db.Model):
+    __tablename__ = "lot_plastic_items"
+    __table_args__ = (
+        db.CheckConstraint("weight > 0", name="ck_lot_plastic_items_weight_positive"),
+        db.CheckConstraint("weight_unit IN ('kg')", name="ck_lot_plastic_items_weight_unit"),
+        db.UniqueConstraint("lot_id", "plastic_type", name="uq_lot_plastic_item_type"),
+    )
+
+    id = db.Column(db.String(64), primary_key=True, default=lambda: new_id("lotitem"))
+    lot_id = db.Column(db.String(64), db.ForeignKey("plastic_lots.id", ondelete="CASCADE"), nullable=False, index=True)
+    plastic_type = db.Column(db.String(32), nullable=False, index=True)
+    custom_plastic_type = db.Column(db.String(120))
+    weight = db.Column(db.Numeric(10, 2), nullable=False)
+    weight_unit = db.Column(db.String(8), nullable=False, default="kg")
+
+    lot = db.relationship("PlasticLot", back_populates="plastic_items")
 
 
 class CollectorOffer(TimestampMixin, db.Model):

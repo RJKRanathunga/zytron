@@ -3,8 +3,9 @@ import { BinCard } from '../components/cards/BinCard'
 import { SegmentedControl } from '../components/common/SegmentedControl'
 import { useOwnerApp } from '../hooks/useOwnerApp'
 import type { MaterialFilter } from '../types/domain'
+import { MATERIAL_FILTER_OPTIONS } from '../../config/plasticMaterials'
 
-const materialOptions: readonly MaterialFilter[] = ['All', 'PP', 'PET', 'HDPE', 'LDPE']
+const materialOptions = MATERIAL_FILTER_OPTIONS satisfies readonly MaterialFilter[]
 
 export function BinsPage() {
   const app = useOwnerApp()
