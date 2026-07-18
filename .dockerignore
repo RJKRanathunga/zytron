@@ -1,0 +1,15 @@
+.git
+.github
+src/server/.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.log
+.env
+.idea
+.vscode
+node_modules
+build
+dist

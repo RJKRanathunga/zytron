@@ -1,0 +1,21 @@
+{
+    admin off
+    persist_config off
+    auto_https off
+}
+
+:{$PORT:3000} {
+    handle /health {
+        respond "OK" 200
+    }
+
+    handle {
+        root * /app/dist
+        encode gzip
+
+        # Required for React Router and other SPA routers
+        try_files {path} /index.html
+
+        file_server
+    }
+}
