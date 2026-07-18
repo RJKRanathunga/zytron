@@ -35,6 +35,16 @@ def auth_payload(user: User) -> dict:
     }
 
 
+def require_website_role(user: User) -> None:
+    if user.role not in {"collector", "owner"}:
+        current_app.logger.warning(
+            "Authentication rejected for PostgreSQL user %s: missing or unsupported website role %s.",
+            user.id,
+            user.role or "empty",
+        )
+        raise PermissionDenied("Your account does not have a valid website role.")
+
+
 def firebase_identity() -> tuple[str, str]:
     decoded = verify_firebase_token()
     uid = decoded.get("uid")
@@ -112,6 +122,7 @@ def register():
     if not user.is_active:
         current_app.logger.warning("Registration rejected for %s: PostgreSQL user is inactive.", email)
         raise PermissionDenied("This account is inactive.")
+    require_website_role(user)
     user.touch_login()
     db.session.commit()
     return data_response(auth_payload(user), 201)
@@ -142,6 +153,7 @@ def login():
     if not user.is_active:
         current_app.logger.warning("Login rejected for %s: PostgreSQL user is inactive.", email)
         raise PermissionDenied("This account is inactive.")
+    require_website_role(user)
     user.touch_login()
     db.session.commit()
     return data_response(auth_payload(user))
@@ -163,5 +175,6 @@ def me():
             email,
         )
         raise PermissionDenied("Authentication is required.")
+    require_website_role(user)
     db.session.commit()
     return data_response({"user": auth_user(user), "snapshot": snapshot_for(user) if user.role in {"collector", "owner"} else None})

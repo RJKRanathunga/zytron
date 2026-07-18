@@ -57,7 +57,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, all
   if (!headers.has('Content-Type') && options.body) {
     headers.set('Content-Type', 'application/json')
   }
-  const idToken = await currentFirebaseIdToken()
+  const idToken = headers.has('Authorization') ? null : await currentFirebaseIdToken()
   if (idToken) {
     headers.set('Authorization', `Bearer ${idToken}`)
   }
