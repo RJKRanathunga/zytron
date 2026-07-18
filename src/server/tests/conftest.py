@@ -9,7 +9,6 @@ from app.services.seed_data import DEMO_PASSWORD, seed_database
 
 
 class TestConfig(TestingConfig):
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     JWT_SECRET_KEY = "test-jwt-secret-change-me-please-32-bytes"
     SECRET_KEY = "test-secret-change-me-please-32-bytes"
 

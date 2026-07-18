@@ -1,13 +1,12 @@
-"""initial schema
+"""initial PostgreSQL schema
 
 Revision ID: 0001_initial_schema
 Revises:
 Create Date: 2026-07-17 00:00:00.000000
 """
 from alembic import op
+import sqlalchemy as sa
 
-from app.extensions import db
-import app.models  # noqa: F401
 
 revision = "0001_initial_schema"
 down_revision = None
@@ -15,11 +14,496 @@ branch_labels = None
 depends_on = None
 
 
+def timestamp_columns():
+    return [
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+    ]
+
+
 def upgrade():
-    bind = op.get_bind()
-    db.metadata.create_all(bind=bind)
+    op.create_table(
+        "organizations",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("name", sa.String(length=160), nullable=False),
+        sa.Column("organization_type", sa.String(length=32), nullable=False),
+        sa.Column("registration_number", sa.String(length=80)),
+        sa.Column("description", sa.Text()),
+        sa.Column("phone", sa.String(length=40)),
+        sa.Column("email", sa.String(length=160)),
+        sa.Column("address", sa.String(length=255)),
+        sa.Column("district", sa.String(length=80)),
+        *timestamp_columns(),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "plastic_materials",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("code", sa.String(length=16), nullable=False),
+        sa.Column("name", sa.String(length=120), nullable=False),
+        sa.Column("description", sa.Text()),
+        sa.Column("display_color", sa.String(length=24), nullable=False, server_default="#19bf91"),
+        sa.Column("resin_code", sa.String(length=16)),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "users",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("email", sa.String(length=160), nullable=False),
+        sa.Column("password_hash", sa.String(length=255), nullable=False),
+        sa.Column("first_name", sa.String(length=80), nullable=False),
+        sa.Column("last_name", sa.String(length=80), nullable=False),
+        sa.Column("phone", sa.String(length=40)),
+        sa.Column("role", sa.String(length=32), nullable=False),
+        sa.Column("avatar_url", sa.String(length=255)),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("is_verified", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("last_login_at", sa.DateTime(timezone=True)),
+        sa.Column("organization_id", sa.String(length=64)),
+        sa.Column("base_location", sa.String(length=120)),
+        sa.Column("vehicle_capacity_kg", sa.Numeric(10, 2), server_default=sa.text("100")),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "collection_points",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("owner_id", sa.String(length=64), nullable=False),
+        sa.Column("organization_id", sa.String(length=64)),
+        sa.Column("name", sa.String(length=160), nullable=False),
+        sa.Column("description", sa.Text()),
+        sa.Column("address", sa.String(length=255), nullable=False),
+        sa.Column("city", sa.String(length=80)),
+        sa.Column("district", sa.String(length=80)),
+        sa.Column("latitude", sa.Numeric(10, 7), nullable=False),
+        sa.Column("longitude", sa.Numeric(10, 7), nullable=False),
+        sa.Column("opening_hours", sa.String(length=120)),
+        sa.Column("access_instructions", sa.Text()),
+        sa.Column("contact_phone", sa.String(length=40)),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("is_verified", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("reliability_score", sa.Integer(), nullable=False, server_default=sa.text("90")),
+        sa.Column("rating", sa.Numeric(3, 2), nullable=False, server_default=sa.text("4.7")),
+        sa.Column("handovers", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "smart_bins",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("collection_point_id", sa.String(length=64), nullable=False),
+        sa.Column("device_code", sa.String(length=80), nullable=False),
+        sa.Column("device_secret", sa.String(length=255)),
+        sa.Column("name", sa.String(length=120), nullable=False),
+        sa.Column("model", sa.String(length=80)),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="online"),
+        sa.Column("firmware_version", sa.String(length=40)),
+        sa.Column("last_seen_at", sa.DateTime(timezone=True)),
+        sa.Column("installed_at", sa.DateTime(timezone=True)),
+        sa.Column("last_maintenance_at", sa.DateTime(timezone=True)),
+        sa.Column("next_maintenance_at", sa.DateTime(timezone=True)),
+        sa.Column("location_label", sa.String(length=120)),
+        sa.Column("battery_percent", sa.Integer(), nullable=False, server_default=sa.text("88")),
+        sa.Column("camera_status", sa.String(length=80), nullable=False, server_default="Online"),
+        sa.Column("weight_sensor_status", sa.String(length=80), nullable=False, server_default="Online"),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collection_point_id"], ["collection_points.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "bin_compartments",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("smart_bin_id", sa.String(length=64), nullable=False),
+        sa.Column("material_id", sa.String(length=64), nullable=False),
+        sa.Column("capacity_kg", sa.Numeric(10, 2), nullable=False),
+        sa.Column("current_weight_kg", sa.Numeric(10, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("fill_percentage", sa.Numeric(5, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("threshold_percentage", sa.Numeric(5, 2), nullable=False, server_default=sa.text("80")),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="growing"),
+        sa.Column("last_updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["material_id"], ["plastic_materials.id"]),
+        sa.ForeignKeyConstraint(["smart_bin_id"], ["smart_bins.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "device_alerts",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("smart_bin_id", sa.String(length=64), nullable=False),
+        sa.Column("severity", sa.String(length=32), nullable=False, server_default="info"),
+        sa.Column("alert_type", sa.String(length=80), nullable=False, server_default="device"),
+        sa.Column("title", sa.String(length=160), nullable=False),
+        sa.Column("message", sa.Text(), nullable=False),
+        sa.Column("is_resolved", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("resolved_at", sa.DateTime(timezone=True)),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["smart_bin_id"], ["smart_bins.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "plastic_lots",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("owner_id", sa.String(length=64), nullable=False),
+        sa.Column("collection_point_id", sa.String(length=64), nullable=False),
+        sa.Column("material_id", sa.String(length=64), nullable=False),
+        sa.Column("source_compartment_id", sa.String(length=64)),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        sa.Column("description", sa.Text()),
+        sa.Column("estimated_weight_kg", sa.Numeric(10, 2), nullable=False),
+        sa.Column("minimum_weight_kg", sa.Numeric(10, 2), nullable=False, server_default=sa.text("1")),
+        sa.Column("price_per_kg", sa.Numeric(10, 2), nullable=False),
+        sa.Column("currency", sa.String(length=8), nullable=False, server_default="LKR"),
+        sa.Column("quality_grade", sa.String(length=120), nullable=False, server_default="Verified sorted plastic"),
+        sa.Column("availability_start", sa.DateTime(timezone=True)),
+        sa.Column("availability_end", sa.DateTime(timezone=True)),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="available"),
+        sa.Column("published_at", sa.DateTime(timezone=True)),
+        sa.Column("reserved_at", sa.DateTime(timezone=True)),
+        sa.Column("completed_at", sa.DateTime(timezone=True)),
+        sa.Column("views", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("fill_level", sa.Integer(), nullable=False, server_default=sa.text("80")),
+        sa.Column("demand_score", sa.Integer(), nullable=False, server_default=sa.text("80")),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collection_point_id"], ["collection_points.id"]),
+        sa.ForeignKeyConstraint(["material_id"], ["plastic_materials.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["source_compartment_id"], ["bin_compartments.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "collector_offers",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("lot_id", sa.String(length=64), nullable=False),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("offered_price_per_kg", sa.Numeric(10, 2), nullable=False),
+        sa.Column("proposed_pickup_at", sa.DateTime(timezone=True)),
+        sa.Column("pickup_window", sa.String(length=120)),
+        sa.Column("message", sa.Text()),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="pending"),
+        sa.Column("responded_at", sa.DateTime(timezone=True)),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["lot_id"], ["plastic_lots.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "reservations",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("lot_id", sa.String(length=64), nullable=False),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("owner_id", sa.String(length=64), nullable=False),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="pending"),
+        sa.Column("expires_at", sa.DateTime(timezone=True)),
+        sa.Column("cancelled_at", sa.DateTime(timezone=True)),
+        sa.Column("confirmed_at", sa.DateTime(timezone=True)),
+        sa.Column("requested_date", sa.String(length=32)),
+        sa.Column("requested_window", sa.String(length=120)),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["lot_id"], ["plastic_lots.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "pickups",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("lot_id", sa.String(length=64), nullable=False),
+        sa.Column("reservation_id", sa.String(length=64)),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("owner_id", sa.String(length=64), nullable=False),
+        sa.Column("collection_point_id", sa.String(length=64), nullable=False),
+        sa.Column("scheduled_start", sa.DateTime(timezone=True)),
+        sa.Column("scheduled_end", sa.DateTime(timezone=True)),
+        sa.Column("date_label", sa.String(length=64)),
+        sa.Column("time_window", sa.String(length=120)),
+        sa.Column("actual_arrival_at", sa.DateTime(timezone=True)),
+        sa.Column("actual_completion_at", sa.DateTime(timezone=True)),
+        sa.Column("estimated_weight_kg", sa.Numeric(10, 2), nullable=False),
+        sa.Column("verified_weight_kg", sa.Numeric(10, 2)),
+        sa.Column("price_per_kg", sa.Numeric(10, 2), nullable=False),
+        sa.Column("total_amount", sa.Numeric(12, 2), nullable=False),
+        sa.Column("currency", sa.String(length=8), nullable=False, server_default="LKR"),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="requested"),
+        sa.Column("progress_percent", sa.Integer(), nullable=False, server_default=sa.text("10")),
+        sa.Column("qr_code", sa.String(length=80), nullable=False),
+        sa.Column("owner_notes", sa.Text()),
+        sa.Column("collector_notes", sa.Text()),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collection_point_id"], ["collection_points.id"]),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["lot_id"], ["plastic_lots.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["reservation_id"], ["reservations.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("qr_code"),
+    )
+
+    op.create_table(
+        "route_plans",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("name", sa.String(length=160), nullable=False),
+        sa.Column("route_date", sa.String(length=32)),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="draft"),
+        sa.Column("estimated_distance_km", sa.Numeric(10, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("estimated_duration_minutes", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("estimated_total_weight_kg", sa.Numeric(10, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("estimated_total_cost", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "route_stops",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("route_plan_id", sa.String(length=64), nullable=False),
+        sa.Column("pickup_id", sa.String(length=64)),
+        sa.Column("lot_id", sa.String(length=64), nullable=False),
+        sa.Column("collection_point_id", sa.String(length=64), nullable=False),
+        sa.Column("stop_order", sa.Integer(), nullable=False),
+        sa.Column("estimated_arrival_at", sa.String(length=64)),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="planned"),
+        sa.Column("notes", sa.Text()),
+        sa.ForeignKeyConstraint(["collection_point_id"], ["collection_points.id"]),
+        sa.ForeignKeyConstraint(["lot_id"], ["plastic_lots.id"]),
+        sa.ForeignKeyConstraint(["pickup_id"], ["pickups.id"]),
+        sa.ForeignKeyConstraint(["route_plan_id"], ["route_plans.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("route_plan_id", "stop_order", name="uq_route_stop_order"),
+    )
+
+    op.create_table(
+        "transactions",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("pickup_id", sa.String(length=64)),
+        sa.Column("lot_id", sa.String(length=64), nullable=False),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("owner_id", sa.String(length=64), nullable=False),
+        sa.Column("transaction_type", sa.String(length=32), nullable=False, server_default="purchase"),
+        sa.Column("subtotal", sa.Numeric(12, 2), nullable=False),
+        sa.Column("platform_fee", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("total_amount", sa.Numeric(12, 2), nullable=False),
+        sa.Column("currency", sa.String(length=8), nullable=False, server_default="LKR"),
+        sa.Column("payment_method", sa.String(length=80), nullable=False, server_default="Wallet hold"),
+        sa.Column("payment_reference", sa.String(length=120)),
+        sa.Column("payment_status", sa.String(length=32), nullable=False, server_default="pending"),
+        sa.Column("paid_at", sa.DateTime(timezone=True)),
+        sa.Column("title", sa.String(length=180), nullable=False),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["lot_id"], ["plastic_lots.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["pickup_id"], ["pickups.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "demand_alerts",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("name", sa.String(length=160), nullable=False),
+        sa.Column("material_id", sa.String(length=64)),
+        sa.Column("minimum_weight_kg", sa.Numeric(10, 2), nullable=False, server_default=sa.text("1")),
+        sa.Column("maximum_distance_km", sa.Numeric(10, 2), nullable=False, server_default=sa.text("15")),
+        sa.Column("maximum_price_per_kg", sa.Numeric(10, 2)),
+        sa.Column("district", sa.String(length=80)),
+        sa.Column("ready_window", sa.String(length=120), server_default="Ready within 48 hours"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("last_triggered_at", sa.DateTime(timezone=True)),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["material_id"], ["plastic_materials.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "notifications",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("user_id", sa.String(length=64), nullable=False),
+        sa.Column("type", sa.String(length=64), nullable=False),
+        sa.Column("title", sa.String(length=160), nullable=False),
+        sa.Column("message", sa.Text(), nullable=False),
+        sa.Column("resource_type", sa.String(length=64)),
+        sa.Column("resource_id", sa.String(length=64)),
+        sa.Column("is_read", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("read_at", sa.DateTime(timezone=True)),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "message_threads",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("lot_id", sa.String(length=64)),
+        sa.Column("pickup_id", sa.String(length=64)),
+        sa.Column("owner_id", sa.String(length=64), nullable=False),
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["lot_id"], ["plastic_lots.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["pickup_id"], ["pickups.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "messages",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("thread_id", sa.String(length=64), nullable=False),
+        sa.Column("sender_id", sa.String(length=64), nullable=False),
+        sa.Column("recipient_id", sa.String(length=64), nullable=False),
+        sa.Column("body", sa.String(length=1000), nullable=False),
+        sa.Column("is_read", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("read_at", sa.DateTime(timezone=True)),
+        sa.ForeignKeyConstraint(["recipient_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["sender_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["thread_id"], ["message_threads.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "impact_snapshots",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("owner_id", sa.String(length=64)),
+        sa.Column("collector_id", sa.String(length=64)),
+        sa.Column("period", sa.String(length=32), nullable=False, server_default="month"),
+        sa.Column("total_plastic_collected_kg", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("total_completed_pickups", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("estimated_landfill_diversion_kg", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("estimated_co2_savings_kg", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
+        sa.Column("community_participants", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        *timestamp_columns(),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.ForeignKeyConstraint(["owner_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_table(
+        "saved_collection_points",
+        sa.Column("collector_id", sa.String(length=64), nullable=False),
+        sa.Column("collection_point_id", sa.String(length=64), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["collection_point_id"], ["collection_points.id"]),
+        sa.ForeignKeyConstraint(["collector_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("collector_id", "collection_point_id"),
+    )
+
+    op.create_table(
+        "revoked_tokens",
+        sa.Column("jti", sa.String(length=128), nullable=False),
+        sa.Column("token_type", sa.String(length=16), nullable=False),
+        sa.Column("user_id", sa.String(length=64), nullable=False),
+        sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
+        sa.PrimaryKeyConstraint("jti"),
+    )
+
+    indexes = [
+        ("ix_organizations_district", "organizations", ["district"], False),
+        ("ix_plastic_materials_code", "plastic_materials", ["code"], True),
+        ("ix_users_email", "users", ["email"], True),
+        ("ix_users_role", "users", ["role"], False),
+        ("ix_collection_points_district", "collection_points", ["district"], False),
+        ("ix_collection_points_organization_id", "collection_points", ["organization_id"], False),
+        ("ix_collection_points_owner_id", "collection_points", ["owner_id"], False),
+        ("ix_smart_bins_collection_point_id", "smart_bins", ["collection_point_id"], False),
+        ("ix_smart_bins_device_code", "smart_bins", ["device_code"], True),
+        ("ix_smart_bins_status", "smart_bins", ["status"], False),
+        ("ix_bin_compartments_material_id", "bin_compartments", ["material_id"], False),
+        ("ix_bin_compartments_smart_bin_id", "bin_compartments", ["smart_bin_id"], False),
+        ("ix_bin_compartments_status", "bin_compartments", ["status"], False),
+        ("ix_device_alerts_created_at", "device_alerts", ["created_at"], False),
+        ("ix_device_alerts_severity", "device_alerts", ["severity"], False),
+        ("ix_device_alerts_smart_bin_id", "device_alerts", ["smart_bin_id"], False),
+        ("ix_plastic_lots_collection_point_id", "plastic_lots", ["collection_point_id"], False),
+        ("ix_plastic_lots_material_id", "plastic_lots", ["material_id"], False),
+        ("ix_plastic_lots_owner_id", "plastic_lots", ["owner_id"], False),
+        ("ix_plastic_lots_source_compartment_id", "plastic_lots", ["source_compartment_id"], False),
+        ("ix_plastic_lots_status", "plastic_lots", ["status"], False),
+        ("ix_collector_offers_collector_id", "collector_offers", ["collector_id"], False),
+        ("ix_collector_offers_lot_id", "collector_offers", ["lot_id"], False),
+        ("ix_collector_offers_status", "collector_offers", ["status"], False),
+        ("ix_reservations_collector_id", "reservations", ["collector_id"], False),
+        ("ix_reservations_lot_id", "reservations", ["lot_id"], False),
+        ("ix_reservations_owner_id", "reservations", ["owner_id"], False),
+        ("ix_reservations_status", "reservations", ["status"], False),
+        ("ix_pickups_collection_point_id", "pickups", ["collection_point_id"], False),
+        ("ix_pickups_collector_id", "pickups", ["collector_id"], False),
+        ("ix_pickups_lot_id", "pickups", ["lot_id"], False),
+        ("ix_pickups_owner_id", "pickups", ["owner_id"], False),
+        ("ix_pickups_reservation_id", "pickups", ["reservation_id"], False),
+        ("ix_pickups_status", "pickups", ["status"], False),
+        ("ix_route_plans_collector_id", "route_plans", ["collector_id"], False),
+        ("ix_route_plans_status", "route_plans", ["status"], False),
+        ("ix_route_stops_collection_point_id", "route_stops", ["collection_point_id"], False),
+        ("ix_route_stops_lot_id", "route_stops", ["lot_id"], False),
+        ("ix_route_stops_pickup_id", "route_stops", ["pickup_id"], False),
+        ("ix_route_stops_route_plan_id", "route_stops", ["route_plan_id"], False),
+        ("ix_transactions_collector_id", "transactions", ["collector_id"], False),
+        ("ix_transactions_lot_id", "transactions", ["lot_id"], False),
+        ("ix_transactions_owner_id", "transactions", ["owner_id"], False),
+        ("ix_transactions_payment_status", "transactions", ["payment_status"], False),
+        ("ix_transactions_pickup_id", "transactions", ["pickup_id"], False),
+        ("ix_demand_alerts_collector_id", "demand_alerts", ["collector_id"], False),
+        ("ix_demand_alerts_material_id", "demand_alerts", ["material_id"], False),
+        ("ix_notifications_created_at", "notifications", ["created_at"], False),
+        ("ix_notifications_is_read", "notifications", ["is_read"], False),
+        ("ix_notifications_type", "notifications", ["type"], False),
+        ("ix_notifications_user_id", "notifications", ["user_id"], False),
+        ("ix_message_threads_collector_id", "message_threads", ["collector_id"], False),
+        ("ix_message_threads_lot_id", "message_threads", ["lot_id"], False),
+        ("ix_message_threads_owner_id", "message_threads", ["owner_id"], False),
+        ("ix_message_threads_pickup_id", "message_threads", ["pickup_id"], False),
+        ("ix_messages_created_at", "messages", ["created_at"], False),
+        ("ix_messages_is_read", "messages", ["is_read"], False),
+        ("ix_messages_recipient_id", "messages", ["recipient_id"], False),
+        ("ix_messages_sender_id", "messages", ["sender_id"], False),
+        ("ix_messages_thread_id", "messages", ["thread_id"], False),
+        ("ix_impact_snapshots_collector_id", "impact_snapshots", ["collector_id"], False),
+        ("ix_impact_snapshots_owner_id", "impact_snapshots", ["owner_id"], False),
+    ]
+    for name, table, columns, unique in indexes:
+        op.create_index(op.f(name), table, columns, unique=unique)
 
 
 def downgrade():
-    bind = op.get_bind()
-    db.metadata.drop_all(bind=bind)
+    for table in [
+        "revoked_tokens",
+        "saved_collection_points",
+        "impact_snapshots",
+        "messages",
+        "message_threads",
+        "notifications",
+        "demand_alerts",
+        "transactions",
+        "route_stops",
+        "route_plans",
+        "pickups",
+        "reservations",
+        "collector_offers",
+        "plastic_lots",
+        "device_alerts",
+        "bin_compartments",
+        "smart_bins",
+        "collection_points",
+        "users",
+        "plastic_materials",
+        "organizations",
+    ]:
+        op.drop_table(table)

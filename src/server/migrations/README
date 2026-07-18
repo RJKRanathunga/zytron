@@ -1,8 +1,8 @@
-Flask-Migrate/Alembic migrations for the PolyLoop Flask API.
+Flask-Migrate/Alembic PostgreSQL migrations for the PolyLoop Flask API.
 
-Run from src/server:
+Run from src/server with the PG_* environment variables configured:
 
     flask db upgrade
 
-The initial migration creates the SQLAlchemy model metadata so local SQLite and
-PostgreSQL development databases stay aligned with the application models.
+The initial migration creates the explicit PostgreSQL table, constraint, and
+index schema that matches the application models.

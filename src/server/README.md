@@ -11,7 +11,15 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` for local overrides. The default development database is SQLite at `instance/polyloop.sqlite`; set `DATABASE_URL` to a PostgreSQL URL when needed.
+Copy `.env.example` to `.env` for local overrides. The API uses PostgreSQL through SQLAlchemy and reads connection values from:
+
+```env
+PG_HOST=localhost
+PG_PORT=5432
+PG_DATABASE=zytron_db
+PG_USER=postgres
+PG_PASSWORD=
+```
 
 ## Database
 
@@ -20,6 +28,15 @@ $env:FLASK_APP="run.py"
 flask db upgrade
 flask seed
 ```
+
+To migrate existing local SQLite data into PostgreSQL, first run the PostgreSQL migrations, then copy rows from the original SQLite file:
+
+```powershell
+python scripts\migrate_sqlite_to_postgres.py --dry-run
+python scripts\migrate_sqlite_to_postgres.py
+```
+
+The script reads `instance/polyloop.sqlite` by default and does not modify it. If the PostgreSQL tables already contain data and you want a fresh copy, pass `--truncate-postgres`.
 
 `flask seed` is idempotent and creates demo users, organizations, materials, collection points, smart bins, compartments, lots, offers, reservations, pickups, route plans, transactions, notifications, messages, demand alerts, and impact snapshots.
 
@@ -133,7 +150,7 @@ cd D:\Uni_Projects\zytron\zytron\src\server
 python -m pytest
 ```
 
-Tests use an isolated in-memory SQLite database.
+Tests use the PostgreSQL database named by `TEST_DATABASE_URL`, or `PG_TEST_DATABASE` when set. If neither is set, tests use `<PG_DATABASE>_test`.
 
 ## Security Notes And Limitations
 
