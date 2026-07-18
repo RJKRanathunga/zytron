@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 config
+!/config/
+!/config/app-config.js
+!/config/app-config.d.ts
+!/config/firebase-config.js
+!/config/firebase-config.d.ts

@@ -124,11 +124,13 @@ Errors use:
 
 ## Frontend Configuration
 
-Both React apps include `.env.example`:
+The React website loads public frontend values from:
 
-```env
-VITE_API_BASE_URL=http://127.0.0.1:5000/api/v1
+```text
+../website/config/app-config.js
 ```
+
+Keep backend-only values, PostgreSQL credentials, Firebase service-account credentials, and server Google Maps keys in the backend environment only.
 
 Start the apps after the Flask API is running:
 

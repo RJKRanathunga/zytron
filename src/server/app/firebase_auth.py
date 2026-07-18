@@ -29,6 +29,7 @@ def init_firebase_admin(app) -> None:
         app.logger.warning("firebase-admin is not installed; Firebase token verification is unavailable.")
         return
     if firebase_admin._apps:
+        app.logger.info("Firebase Admin already initialized; reusing existing app.")
         return
 
     options = {}
@@ -45,12 +46,18 @@ def init_firebase_admin(app) -> None:
         credential = credentials.ApplicationDefault()
 
     firebase_admin.initialize_app(credential, options or None)
+    app.logger.info("Firebase Admin initialized for project %s.", options.get("projectId") or "from credentials")
 
 
 def bearer_token() -> str:
     header = request.headers.get("Authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
+        current_app.logger.warning(
+            "Firebase auth rejected %s %s: missing or malformed Authorization bearer token.",
+            request.method,
+            request.path,
+        )
         raise FirebaseAuthError()
     return token
 
@@ -67,9 +74,21 @@ def verify_firebase_token(id_token: str | None = None) -> dict[str, Any]:
         firebase_user = firebase_admin_auth.get_user(decoded["uid"])
     except Exception as error:  # Firebase Admin raises several concrete auth errors.
         message = str(error)
+        current_app.logger.warning(
+            "Firebase auth rejected %s %s: invalid Firebase ID token (%s).",
+            request.method,
+            request.path,
+            message,
+        )
         if "disabled" in message.lower():
             raise FirebaseAuthError("This account has been disabled.", 403) from error
         raise FirebaseAuthError("Your session could not be verified.") from error
     if firebase_user.disabled:
+        current_app.logger.warning(
+            "Firebase auth rejected %s %s: disabled Firebase user %s.",
+            request.method,
+            request.path,
+            decoded.get("uid"),
+        )
         raise FirebaseAuthError("This account has been disabled.", 403)
     return decoded

@@ -9,7 +9,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth'
 import { ApiClientError, apiRequest, clearAuthTokens } from '../services/apiClient'
-import { firebaseAuth, googleProvider } from './firebase'
+import { firebaseAuth, firebaseConfigError, googleProvider, requireFirebaseAuth } from './firebase'
 import type { AuthUser, UserRole } from '../types/auth'
 import { isUserRole } from '../types/auth'
 import type { RegisterInput } from './AuthContext'
@@ -81,10 +81,22 @@ function splitFirebaseName(firebaseUser: FirebaseUser, fallbackEmail: string) {
   return { firstName: fallbackName, lastName: 'User' }
 }
 
-async function syncLogin(body: Record<string, unknown> = {}) {
+async function clearFirebaseSession() {
+  if (firebaseAuth) {
+    await signOut(firebaseAuth).catch(() => undefined)
+  }
+}
+
+async function freshFirebaseAuthHeader(firebaseUser: FirebaseUser) {
+  const token = await firebaseUser.getIdToken(true)
+  return { Authorization: `Bearer ${token}` }
+}
+
+async function syncLogin(firebaseUser: FirebaseUser, body: Record<string, unknown> = {}) {
   try {
     const response = await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
+      headers: await freshFirebaseAuthHeader(firebaseUser),
       body: JSON.stringify(body),
     })
     return requireValidRole(response.user)
@@ -117,23 +129,27 @@ export async function requireRole(role: UserRole) {
 }
 
 export const authService = {
-  hasSession: () => Boolean(firebaseAuth.currentUser),
+  configurationError: firebaseConfigError,
+
+  hasSession: () => Boolean(firebaseAuth?.currentUser),
 
   login: async (email: string, password: string): Promise<AuthUser> => {
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email, password)
-      return await syncLogin()
+      const credential = await signInWithEmailAndPassword(requireFirebaseAuth(), email, password)
+      return await syncLogin(credential.user)
     } catch (error) {
+      await clearFirebaseSession()
       throw new Error(firebaseErrorMessage(error), { cause: error })
     }
   },
 
   register: async (input: RegisterInput): Promise<AuthUser> => {
     try {
-      const credential = await createUserWithEmailAndPassword(firebaseAuth, input.email, input.password)
+      const credential = await createUserWithEmailAndPassword(requireFirebaseAuth(), input.email, input.password)
       await updateProfile(credential.user, { displayName: `${input.firstName} ${input.lastName}`.trim() })
       const response = await apiRequest<AuthResponse>('/auth/register', {
         method: 'POST',
+        headers: await freshFirebaseAuthHeader(credential.user),
         body: JSON.stringify({
           first_name: input.firstName,
           last_name: input.lastName,
@@ -144,13 +160,14 @@ export const authService = {
       })
       return requireValidRole(response.user)
     } catch (error) {
+      await clearFirebaseSession()
       throw new Error(firebaseErrorMessage(error), { cause: error })
     }
   },
 
   loginWithGoogle: async (profile: GoogleProfileInput = {}): Promise<AuthUser> => {
     try {
-      const credential = await signInWithPopup(firebaseAuth, googleProvider)
+      const credential = await signInWithPopup(requireFirebaseAuth(), googleProvider)
       const email = credential.user.email ?? ''
       const names = splitFirebaseName(credential.user, email)
       const body = profile.role
@@ -161,15 +178,16 @@ export const authService = {
             organization_name: profile.organizationName || credential.user.displayName || names.firstName,
           }
         : {}
-      return await syncLogin(body)
+      return await syncLogin(credential.user, body)
     } catch (error) {
+      await clearFirebaseSession()
       throw new Error(firebaseErrorMessage(error), { cause: error })
     }
   },
 
   resetPassword: async (email: string): Promise<void> => {
     try {
-      await sendPasswordResetEmail(firebaseAuth, email)
+      await sendPasswordResetEmail(requireFirebaseAuth(), email)
     } catch (error) {
       throw new Error(firebaseErrorMessage(error), { cause: error })
     }
@@ -182,9 +200,16 @@ export const authService = {
 
   logout: async () => {
     clearAuthTokens()
-    await signOut(firebaseAuth)
+    if (firebaseAuth) {
+      await signOut(firebaseAuth)
+    }
   },
 
-  onFirebaseAuthStateChanged: (callback: (user: FirebaseUser | null) => void) =>
-    onAuthStateChanged(firebaseAuth, callback),
+  onFirebaseAuthStateChanged: (callback: (user: FirebaseUser | null) => void) => {
+    if (!firebaseAuth) {
+      queueMicrotask(() => callback(null))
+      return () => undefined
+    }
+    return onAuthStateChanged(firebaseAuth, callback)
+  },
 }

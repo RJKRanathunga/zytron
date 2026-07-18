@@ -1,6 +1,7 @@
 import { currentFirebaseIdToken } from '../auth/firebase'
+import { appConfig } from '../../config/app-config.js'
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5000/api/v1'
+export const API_BASE_URL = appConfig.apiBaseUrl
 const TOKEN_STORAGE_KEY = 'polyloop-auth'
 const OWNER_TOKEN_STORAGE_KEY = 'polyloop-owner-auth'
 const COLLECTOR_TOKEN_STORAGE_KEY = 'polyloop-collector-auth'

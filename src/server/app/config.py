@@ -29,19 +29,25 @@ def build_postgresql_uri(*, database: str | None = None) -> str:
     return f"postgresql+psycopg://{auth}@{host}:{port}/{quote(db_name)}"
 
 
+def engine_options_for(database_uri: str) -> dict:
+    if database_uri.startswith("sqlite"):
+        return {}
+    return {"connect_args": {"connect_timeout": int(os.getenv("PG_CONNECT_TIMEOUT", "10"))}}
+
+
 class BaseConfig:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me-please-32-bytes")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-me-please-32-bytes")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = build_postgresql_uri()
-    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"connect_timeout": int(os.getenv("PG_CONNECT_TIMEOUT", "10"))}}
+    SQLALCHEMY_ENGINE_OPTIONS = engine_options_for(SQLALCHEMY_DATABASE_URI)
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRES_MINUTES", "30")))
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(os.getenv("REFRESH_TOKEN_EXPIRES_DAYS", "14")))
     CORS_ORIGINS = [
         origin.strip()
         for origin in os.getenv(
             "CORS_ORIGINS",
-            "http://127.0.0.1:5173,http://127.0.0.1:5174,http://localhost:5173,http://localhost:5174",
+            "http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,http://localhost:5173,http://localhost:5174,http://localhost:5175",
         ).split(",")
         if origin.strip()
     ]
@@ -66,6 +72,7 @@ class TestingConfig(BaseConfig):
         "TEST_DATABASE_URL",
         build_postgresql_uri(database=os.getenv("PG_TEST_DATABASE", f"{os.environ['PG_DATABASE']}_test")),
     )
+    SQLALCHEMY_ENGINE_OPTIONS = engine_options_for(SQLALCHEMY_DATABASE_URI)
 
 
 class ProductionConfig(BaseConfig):

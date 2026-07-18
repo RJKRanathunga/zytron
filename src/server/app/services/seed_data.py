@@ -350,7 +350,7 @@ def seed_database():
             LotPlasticItem,
             f"lotitem-{lot_id}",
             lot=lot,
-            plastic_type=lot.material.code,
+            plastic_type=db.session.get(PlasticMaterial, mat_id).code,
             custom_plastic_type=None,
             weight=weight,
             weight_unit="kg",

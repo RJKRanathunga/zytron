@@ -1,3 +1,5 @@
+import { appConfig } from '../../config/app-config.js'
+
 export interface LatLng {
   lat: number
   lng: number
@@ -58,7 +60,7 @@ declare global {
 }
 
 export function googleMapsBrowserKey() {
-  return import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string | undefined
+  return appConfig.googleMapsBrowserApiKey
 }
 
 export function loadGoogleMaps(): Promise<GoogleMapsRuntime> {
@@ -67,7 +69,9 @@ export function loadGoogleMaps(): Promise<GoogleMapsRuntime> {
 
   const key = googleMapsBrowserKey()
   if (!key) {
-    return Promise.reject(new Error('Google Maps browser API key is not configured.'))
+    const error = new Error('Google Maps browser API key is not configured.')
+    console.error(error.message)
+    return Promise.reject(error)
   }
 
   window.__zytronGoogleMapsPromise = new Promise((resolve, reject) => {

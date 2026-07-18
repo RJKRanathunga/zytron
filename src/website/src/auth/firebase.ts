@@ -1,4 +1,3 @@
-import { initializeApp, type FirebaseOptions } from 'firebase/app'
 import {
   browserLocalPersistence,
   getAuth,
@@ -6,32 +5,26 @@ import {
   setPersistence,
   type User as FirebaseUser,
 } from 'firebase/auth'
+import { firebaseApp, firebaseConfigError } from '../../config/firebase-config.js'
 
-const firebaseConfig: FirebaseOptions = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-}
-
-const requiredFirebaseKeys = ['apiKey', 'authDomain', 'projectId', 'appId'] as const
-const missingKeys = requiredFirebaseKeys.filter((key) => !firebaseConfig[key])
-
-if (missingKeys.length > 0) {
-  throw new Error(`Missing Firebase configuration: ${missingKeys.join(', ')}`)
-}
-
-export const firebaseApp = initializeApp(firebaseConfig)
-export const firebaseAuth = getAuth(firebaseApp)
+export { firebaseConfigError }
+export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null
 export const googleProvider = new GoogleAuthProvider()
+
+export function requireFirebaseAuth() {
+  if (!firebaseAuth) {
+    throw new Error(firebaseConfigError || 'Firebase authentication is not configured.')
+  }
+  return firebaseAuth
+}
 
 googleProvider.setCustomParameters({ prompt: 'select_account' })
 
-void setPersistence(firebaseAuth, browserLocalPersistence)
+if (firebaseAuth) {
+  void setPersistence(firebaseAuth, browserLocalPersistence)
+}
 
 export async function currentFirebaseIdToken(forceRefresh = false): Promise<string | null> {
-  const user: FirebaseUser | null = firebaseAuth.currentUser
+  const user: FirebaseUser | null = firebaseAuth?.currentUser ?? null
   return user ? user.getIdToken(forceRefresh) : null
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authService } from './authService'
 import { AuthContext } from './AuthContext'
 import { AUTH_CLEARED_EVENT } from '../services/apiClient'
@@ -9,7 +9,8 @@ import type { UserRole } from '../types/auth'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(authService.configurationError)
+  const activeAuthOperation = useRef(false)
 
   const reloadUser = useCallback(async () => {
     if (!authService.hasSession()) {
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser)
       return currentUser
     } catch (loadError) {
+      await authService.logout()
       setUser(null)
       setError(loadError instanceof Error ? loadError.message : 'Your session could not be restored.')
       return null
@@ -36,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(
     () =>
       authService.onFirebaseAuthStateChanged((firebaseUser) => {
+        if (activeAuthOperation.current) {
+          return
+        }
         if (firebaseUser) {
           void reloadUser()
         } else {
@@ -53,24 +58,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
+    activeAuthOperation.current = true
     setError('')
-    const authenticatedUser = await authService.login(email, password)
-    setUser(authenticatedUser)
-    return authenticatedUser
+    try {
+      const authenticatedUser = await authService.login(email, password)
+      setUser(authenticatedUser)
+      return authenticatedUser
+    } finally {
+      activeAuthOperation.current = false
+    }
   }, [])
 
   const loginWithGoogle = useCallback(async (role?: UserRole) => {
+    activeAuthOperation.current = true
     setError('')
-    const authenticatedUser = await authService.loginWithGoogle({ role })
-    setUser(authenticatedUser)
-    return authenticatedUser
+    try {
+      const authenticatedUser = await authService.loginWithGoogle({ role })
+      setUser(authenticatedUser)
+      return authenticatedUser
+    } finally {
+      activeAuthOperation.current = false
+    }
   }, [])
 
   const register = useCallback(async (input: RegisterInput) => {
+    activeAuthOperation.current = true
     setError('')
-    const authenticatedUser = await authService.register(input)
-    setUser(authenticatedUser)
-    return authenticatedUser
+    try {
+      const authenticatedUser = await authService.register(input)
+      setUser(authenticatedUser)
+      return authenticatedUser
+    } finally {
+      activeAuthOperation.current = false
+    }
   }, [])
 
   const resetPassword = useCallback(async (email: string) => {
