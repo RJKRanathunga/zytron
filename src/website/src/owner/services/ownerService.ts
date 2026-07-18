@@ -1,12 +1,18 @@
 import { apiRequest } from '../../services/apiClient'
 import { authService } from '../../auth/authService'
 import type { OwnerSnapshot } from '../types/domain'
+import type { CheckoutSession, SellerBilling, SellerPackage } from '../types/domain'
 
 export interface OwnerService {
   hasSession: () => boolean
   logout: () => Promise<void>
   loadSnapshot: () => Promise<OwnerSnapshot>
+  loadPackages: () => Promise<SellerPackage[]>
+  loadBilling: () => Promise<SellerBilling>
   publishLot: (binId: string, pricePerKg: number, pickupWindow: string) => Promise<OwnerSnapshot>
+  createSubscriptionCheckout: () => Promise<CheckoutSession>
+  cancelSubscription: () => Promise<SellerBilling>
+  createListingPaymentCheckout: (lotId: string) => Promise<CheckoutSession>
   withdrawLot: (lotId: string) => Promise<OwnerSnapshot>
   acceptOffer: (offerId: string, pickupDate: string, timeWindow: string) => Promise<OwnerSnapshot>
   rejectOffer: (offerId: string) => Promise<OwnerSnapshot>
@@ -39,6 +45,10 @@ export const ownerService: OwnerService = {
 
   loadSnapshot: reloadSnapshot,
 
+  loadPackages: () => apiRequest<SellerPackage[]>('/packages'),
+
+  loadBilling: () => apiRequest<SellerBilling>('/seller/billing'),
+
   publishLot: async (binId, pricePerKg, pickupWindow) => {
     await apiRequest('/lots', {
       method: 'POST',
@@ -46,6 +56,15 @@ export const ownerService: OwnerService = {
     })
     return reloadSnapshot()
   },
+
+  createSubscriptionCheckout: () => apiRequest<CheckoutSession>('/seller/subscription/checkout', { method: 'POST' }),
+
+  cancelSubscription: async () => {
+    await apiRequest('/seller/subscription/cancel', { method: 'POST' })
+    return ownerService.loadBilling()
+  },
+
+  createListingPaymentCheckout: (lotId) => apiRequest<CheckoutSession>(`/lots/${lotId}/payment/checkout`, { method: 'POST' }),
 
   withdrawLot: async (lotId) => {
     await apiRequest(`/lots/${lotId}/withdraw`, { method: 'POST' })

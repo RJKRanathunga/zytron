@@ -11,13 +11,17 @@ from app.models import (
     DeviceAlert,
     MessageThread,
     Notification,
+    ListingPayment,
+    Package,
     Pickup,
     PlasticLot,
+    PaymentTransaction,
     Reservation,
     RoutePlan,
     SmartBin,
     Transaction,
     User,
+    SellerSubscription,
 )
 
 def as_float(value) -> float:
@@ -45,21 +49,106 @@ def iso(dt: datetime | None) -> str | None:
     return dt.astimezone(timezone.utc).isoformat()
 
 
+def package_record(package: Package) -> dict:
+    return {
+        "id": package.id,
+        "code": package.code,
+        "name": package.name,
+        "description": package.description or "",
+        "billingType": package.billing_type,
+        "price": as_float(package.price),
+        "currency": package.currency,
+        "billingInterval": package.billing_interval,
+        "listingLimit": package.listing_limit,
+        "isActive": package.is_active,
+        "createdAt": iso(package.created_at),
+        "updatedAt": iso(package.updated_at),
+    }
+
+
+def subscription_record(subscription: SellerSubscription | None) -> dict | None:
+    if not subscription:
+        return None
+    return {
+        "id": subscription.id,
+        "package": package_record(subscription.package),
+        "status": subscription.status,
+        "provider": subscription.provider,
+        "startedAt": iso(subscription.started_at),
+        "currentPeriodStart": iso(subscription.current_period_start),
+        "currentPeriodEnd": iso(subscription.current_period_end),
+        "cancelAtPeriodEnd": subscription.cancel_at_period_end,
+        "cancelledAt": iso(subscription.cancelled_at),
+        "createdAt": iso(subscription.created_at),
+        "updatedAt": iso(subscription.updated_at),
+    }
+
+
+def listing_payment_record(payment: ListingPayment | None) -> dict | None:
+    if not payment:
+        return None
+    return {
+        "id": payment.id,
+        "listingId": payment.listing_id,
+        "package": package_record(payment.package),
+        "amount": as_float(payment.amount),
+        "currency": payment.currency,
+        "status": payment.status,
+        "provider": payment.provider,
+        "providerPaymentId": payment.provider_payment_id,
+        "paidAt": iso(payment.paid_at),
+        "createdAt": iso(payment.created_at),
+        "updatedAt": iso(payment.updated_at),
+    }
+
+
+def payment_transaction_record(transaction: PaymentTransaction) -> dict:
+    return {
+        "id": transaction.id,
+        "subscriptionId": transaction.subscription_id,
+        "listingPaymentId": transaction.listing_payment_id,
+        "transactionType": transaction.transaction_type,
+        "amount": as_float(transaction.amount),
+        "currency": transaction.currency,
+        "status": transaction.status,
+        "provider": transaction.provider,
+        "providerReference": transaction.provider_reference,
+        "metadata": transaction.metadata_json or {},
+        "createdAt": iso(transaction.created_at),
+        "updatedAt": iso(transaction.updated_at),
+    }
+
+
+def billing_record(summary: dict) -> dict:
+    return {
+        "currentPackage": package_record(summary["currentPackage"]) if summary.get("currentPackage") else None,
+        "activeSubscription": subscription_record(summary.get("activeSubscription")),
+        "publishedListingCount": summary["publishedListingCount"],
+        "draftListingCount": summary["draftListingCount"],
+        "pendingPaymentCount": summary["pendingPaymentCount"],
+        "subscriptionHistory": [subscription_record(item) for item in summary["subscriptionHistory"]],
+        "listingPayments": [listing_payment_record(item) for item in summary["listingPayments"]],
+        "paymentHistory": [payment_transaction_record(item) for item in summary["paymentHistory"]],
+    }
+
+
 def collector_lot_status(lot: PlasticLot) -> str:
     if lot.status in {"reserved", "pickup_scheduled"}:
         return "reserved"
-    if lot.status in {"completed", "collected", "cancelled", "withdrawn"}:
+    if lot.status in {"completed", "collected", "cancelled", "withdrawn", "sold"}:
         return "sold"
     return "ready"
 
 
 def owner_lot_status(lot: PlasticLot) -> str:
-    if lot.status in {"available", "pickup_scheduled"}:
+    if lot.status in {"available", "published", "pickup_scheduled"}:
         return "published"
     if lot.status in {"reserved"}:
         return "reserved"
-    if lot.status == "withdrawn":
+    if lot.status in {"withdrawn", "cancelled"}:
         return "withdrawn"
+    if lot.status == "payment_pending":
+        return "payment_pending"
     return "draft"
 
 
@@ -161,6 +250,9 @@ def lot_for_owner(lot: PlasticLot) -> dict:
         "status": owner_lot_status(lot),
         "pickupWindow": lot.availability_start.strftime("%a %d %b, 9:00 AM-12:00 PM") if lot.availability_start else "Flexible pickup",
         "publishedAt": "Just now" if not lot.published_at else lot.published_at.strftime("%a %d %b"),
+        "paymentRequired": lot.payment_required,
+        "publicationSource": lot.publication_source,
+        "expiresAt": iso(lot.expires_at),
         "views": lot.views,
     }
 
@@ -313,7 +405,7 @@ def demand_alert_for_collector(alert: DemandAlert) -> dict:
 
 
 def demand_alert_match_count(alert: DemandAlert) -> int:
-    query = PlasticLot.query.filter(PlasticLot.status == "available")
+    query = PlasticLot.query.filter(PlasticLot.status.in_(["available", "published"]))
     if alert.material_id:
         query = query.filter(PlasticLot.material_id == alert.material_id)
     if alert.maximum_price_per_kg:
@@ -356,7 +448,7 @@ def owner_user(user: User) -> dict:
 def collector_snapshot(user: User) -> dict:
     saved_ids = {saved.collection_point_id for saved in user.saved_collection_points}
     route = RoutePlan.query.filter_by(collector_id=user.id).order_by(RoutePlan.updated_at.desc()).first()
-    lots = PlasticLot.query.filter(PlasticLot.status.in_(["available", "reserved", "pickup_scheduled"])).all()
+    lots = PlasticLot.query.filter(PlasticLot.status.in_(["available", "published", "reserved", "pickup_scheduled"])).all()
     points = CollectionPoint.query.filter_by(is_active=True).all()
     pickups = Pickup.query.filter_by(collector_id=user.id).order_by(Pickup.created_at.desc()).all()
     transactions = Transaction.query.filter_by(collector_id=user.id).order_by(Transaction.created_at.desc()).all()

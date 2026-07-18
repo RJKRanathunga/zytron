@@ -73,7 +73,7 @@ def alert_matches(alert_id: str):
     alert = get_or_404(DemandAlert, alert_id, "The requested demand alert was not found.")
     if user.role == "collector" and alert.collector_id != user.id:
         raise ResourceNotFound("The requested demand alert was not found.")
-    query = PlasticLot.query.filter(PlasticLot.status == "available")
+    query = PlasticLot.query.filter(PlasticLot.status.in_(["available", "published"]))
     if alert.material_id:
         query = query.filter(PlasticLot.material_id == alert.material_id)
     if alert.maximum_price_per_kg:

@@ -21,7 +21,13 @@ export function LotsPage() {
       {app.lots.length > 0 ? (
         <section className="lot-grid">
           {app.lots.map((lot) => (
-            <LotCard key={lot.id} lot={lot} bin={getBinForLot(lot, app.smartBins)} onWithdraw={app.withdrawLot} />
+          <LotCard
+            key={lot.id}
+            lot={lot}
+            bin={getBinForLot(lot, app.smartBins)}
+            onStartPayment={app.startListingPayment}
+            onWithdraw={app.withdrawLot}
+          />
           ))}
         </section>
       ) : (

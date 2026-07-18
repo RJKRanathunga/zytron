@@ -47,6 +47,9 @@ class User(TimestampMixin, db.Model):
     notifications = db.relationship("Notification", back_populates="user")
     demand_alerts = db.relationship("DemandAlert", back_populates="collector")
     saved_collection_points = db.relationship("SavedCollectionPoint", back_populates="collector", cascade="all, delete-orphan")
+    seller_subscriptions = db.relationship("SellerSubscription", back_populates="seller", foreign_keys="SellerSubscription.seller_id")
+    listing_payments = db.relationship("ListingPayment", back_populates="seller", foreign_keys="ListingPayment.seller_id")
+    payment_transactions = db.relationship("PaymentTransaction", back_populates="seller", foreign_keys="PaymentTransaction.seller_id")
 
     @property
     def display_name(self) -> str:

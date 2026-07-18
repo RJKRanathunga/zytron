@@ -204,7 +204,7 @@ def create_or_update_transaction(pickup: Pickup, status: str = "pending") -> Tra
 def create_reservation(user: User, lot_id: str, payload: dict) -> Reservation:
     ensure_collector(user)
     lot = get_or_404(PlasticLot, lot_id, "The requested lot was not found.")
-    if lot.status != "available":
+    if lot.status not in {"available", "published"}:
         raise Conflict("lot_not_available", "This lot is no longer available.")
     if active_reservation_for_lot(lot.id):
         raise Conflict("reservation_conflict", "This lot already has an active reservation.")
@@ -253,7 +253,7 @@ def cancel_reservation(user: User, reservation_id: str) -> Reservation:
 def submit_offer(user: User, lot_id: str, payload: dict) -> CollectorOffer:
     ensure_collector(user)
     lot = get_or_404(PlasticLot, lot_id, "The requested lot was not found.")
-    if lot.status != "available":
+    if lot.status not in {"available", "published"}:
         raise Conflict("lot_not_available", "This lot is no longer accepting offers.")
     existing = CollectorOffer.query.filter_by(lot_id=lot.id, collector_id=user.id, status="pending").first()
     if existing:
@@ -279,7 +279,7 @@ def accept_offer(user: User, offer_id: str, payload: dict) -> CollectorOffer:
     ensure_lot_owner(user, offer.lot)
     if offer.status != "pending":
         raise InvalidState("This offer has already been resolved.")
-    if offer.lot.status not in {"available", "reserved"}:
+    if offer.lot.status not in {"available", "published", "reserved"}:
         raise Conflict("lot_not_available", "This lot can no longer be assigned.")
 
     date_label = payload.get("pickupDate") or payload.get("date") or "Scheduled"
@@ -380,7 +380,7 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     if compartment:
         existing_active = PlasticLot.query.filter(
             PlasticLot.source_compartment_id == compartment.id,
-            PlasticLot.status.in_(["available", "reserved", "pickup_scheduled"]),
+            PlasticLot.status.in_(["available", "published", "reserved", "pickup_scheduled"]),
         ).first()
     if existing_active:
         raise Conflict("inventory_already_published", "This compartment already has an active lot.")
@@ -413,8 +413,8 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
         price_per_kg=price,
         quality_grade=payload.get("quality_grade") or "Verified sorted plastic",
         availability_start=utc_now(),
-        status="available",
-        published_at=utc_now(),
+        status="draft",
+        payment_required=True,
         fill_level=int(min(100, max(0, as_float(compartment.fill_percentage) if compartment else 80))),
         demand_score=90,
     )
@@ -423,8 +423,19 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     db.session.add(lot)
     if compartment:
         compartment.status = "reserved"
-    notify_matching_demand_alerts(lot)
-    create_notification(user.id, "bin", "Lot published", f"{lot.title} is now visible to collectors.", "lot", lot.id)
+    db.session.flush()
+    from app.services.subscriptions import can_publish_listing
+
+    eligibility = can_publish_listing(user, lot)
+    if eligibility["allowed"]:
+        lot.status = "published"
+        lot.payment_required = False
+        lot.publication_source = eligibility["source"]
+        lot.published_at = utc_now()
+        notify_matching_demand_alerts(lot)
+        create_notification(user.id, "bin", "Lot published", f"{lot.title} is now visible to collectors.", "lot", lot.id)
+    else:
+        create_notification(user.id, "payment", "Listing payment required", f"{lot.title} was saved as a draft until a package or FLEX payment is confirmed.", "lot", lot.id)
     db.session.commit()
     return lot
 
@@ -477,7 +488,7 @@ def save_route(user: User, payload: dict) -> RoutePlan:
     route_locations = []
     for index, lot_id in enumerate(lot_ids, start=1):
         lot = get_or_404(PlasticLot, lot_id, "A route lot could not be found.")
-        if lot.status not in {"available", "reserved", "pickup_scheduled"}:
+        if lot.status not in {"available", "published", "reserved", "pickup_scheduled"}:
             raise InvalidState("Only active lots can be added to a route.")
         total_weight += lot.estimated_weight_kg
         total_cost += lot.estimated_weight_kg * lot.price_per_kg

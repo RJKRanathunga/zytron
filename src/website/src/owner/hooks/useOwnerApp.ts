@@ -42,6 +42,7 @@ export interface OwnerAppContext {
   openPublishModal: (binId?: string) => void
   openScheduleModal: (offerId: string) => void
   publishLot: (binId: string, pricePerKg: number, pickupWindow: string) => void
+  startListingPayment: (lotId: string) => void
   withdrawLot: (lotId: string) => void
   acceptOffer: (offerId: string, pickupDate: string, timeWindow: string) => void
   rejectOffer: (offerId: string) => void

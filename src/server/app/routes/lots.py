@@ -10,7 +10,10 @@ from app.models import CollectionPoint, PlasticLot
 from app.permissions import current_user
 from app.routes.helpers import data_response, load_payload, paginated_response
 from app.schemas import PublishLotSchema
-from app.services.serializers import lot_for_collector, lot_for_owner
+from app.services.listing_payments import create_listing_payment, get_listing_payment
+from app.services.payment_provider import checkout_payload, get_payment_provider
+from app.services.serializers import listing_payment_record, lot_for_collector, lot_for_owner
+from app.services.subscriptions import can_publish_listing
 from app.services.workflows import (
     ensure_lot_owner,
     ensure_owner,
@@ -36,12 +39,14 @@ def list_lots():
     if user.role == "owner":
         query = query.filter_by(owner_id=user.id)
     else:
-        query = query.filter(PlasticLot.status.in_(["available", "reserved", "pickup_scheduled"]))
+        query = query.filter(PlasticLot.status.in_(["available", "published", "reserved", "pickup_scheduled"]))
 
     status = request.args.get("status")
     if status:
-        status_map = {"published": "available", "ready": "available"}
-        query = query.filter(PlasticLot.status == status_map.get(status, status))
+        if status in {"published", "ready"}:
+            query = query.filter(PlasticLot.status.in_(["available", "published"]))
+        else:
+            query = query.filter(PlasticLot.status == status)
     material = request.args.get("material")
     if material and material != "All":
         query = query.join(PlasticLot.material).filter_by(code=material.upper())
@@ -85,6 +90,7 @@ def create_lot():
             minimum_weight_kg=Decimal("1"),
             price_per_kg=positive_decimal(payload.get("pricePerKg") or payload.get("price_per_kg"), "pricePerKg"),
             status="draft",
+            payment_required=True,
         )
         db.session.add(lot)
         db.session.commit()
@@ -139,15 +145,66 @@ def publish_existing_lot(lot_id: str):
     user = current_user()
     lot = get_or_404(PlasticLot, lot_id, "The requested lot was not found.")
     ensure_lot_owner(user, lot)
-    if lot.status not in {"draft", "withdrawn"}:
+    if lot.status not in {"draft", "withdrawn", "payment_pending"}:
         raise ApiError("invalid_status_transition", "Only draft or withdrawn lots can be published.", 422)
     if lot.estimated_weight_kg <= 0 or lot.price_per_kg <= 0:
         raise ApiError("validation_error", "A positive weight and price are required.", 400)
-    lot.status = "available"
+    eligibility = can_publish_listing(user, lot)
+    if not eligibility["allowed"]:
+        lot.status = "payment_pending"
+        lot.payment_required = True
+        db.session.commit()
+        payment = create_listing_payment(user, lot)
+        db.session.commit()
+        return data_response(
+            {
+                "lot": lot_for_owner(lot),
+                "requiresPayment": True,
+                "payment": listing_payment_record(payment),
+                "package": eligibility["package"].code,
+            },
+            402,
+        )
+    lot.status = "published"
+    lot.payment_required = False
+    lot.publication_source = eligibility["source"]
     lot.published_at = lot.published_at or lot.created_at
     notify_matching_demand_alerts(lot)
     db.session.commit()
     return data_response(lot_for_owner(lot))
+
+
+@bp.post("/<lot_id>/payment/checkout")
+def create_listing_payment_checkout(lot_id: str):
+    user = current_user()
+    lot = get_or_404(PlasticLot, lot_id, "The requested lot was not found.")
+    ensure_lot_owner(user, lot)
+    payment = create_listing_payment(user, lot)
+    provider = get_payment_provider(payment.provider)
+    checkout = provider.create_one_time_checkout(
+        {
+            **checkout_payload(
+                seller_id=user.id,
+                package_code=payment.package.code,
+                amount=payment.amount,
+                currency=payment.currency,
+                resource_id=lot.id,
+            ),
+            "listing_payment_id": payment.id,
+        }
+    )
+    payment.provider = checkout.provider
+    payment.provider_payment_id = checkout.provider_reference
+    db.session.commit()
+    return data_response({"checkoutUrl": checkout.checkout_url, "payment": listing_payment_record(payment)}, 201)
+
+
+@bp.get("/<lot_id>/payment")
+def get_listing_payment_status(lot_id: str):
+    user = current_user()
+    lot = get_or_404(PlasticLot, lot_id, "The requested lot was not found.")
+    ensure_lot_owner(user, lot)
+    return data_response({"payment": listing_payment_record(get_listing_payment(user, lot))})
 
 
 @bp.post("/<lot_id>/withdraw")

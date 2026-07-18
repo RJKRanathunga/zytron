@@ -20,6 +20,8 @@ const navGroups = [
       { to: '/owner/bins', icon: 'B', label: 'My smart bins', badge: 'bins' },
       { to: '/owner/collection-points', icon: 'P', label: 'Collection points' },
       { to: '/owner/lots', icon: 'L', label: 'Plastic lots' },
+      { to: '/owner/pricing', icon: 'R', label: 'Pricing' },
+      { to: '/owner/billing', icon: '$', label: 'Billing' },
       { to: '/owner/offers', icon: 'O', label: 'Collector offers', badge: 'offers' },
       { to: '/owner/pickups', icon: 'U', label: 'Scheduled pickups', badge: 'pickups' },
     ],
@@ -27,7 +29,7 @@ const navGroups = [
   {
     label: 'Value',
     items: [
-      { to: '/owner/earnings', icon: '$', label: 'Earnings' },
+      { to: '/owner/earnings', icon: 'E', label: 'Earnings' },
       { to: '/owner/impact', icon: 'I', label: 'Impact & community' },
       { to: '/owner/messages', icon: 'C', label: 'Messages', badge: 'messages' },
     ],

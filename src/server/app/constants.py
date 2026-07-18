@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-ACTIVE_LOT_STATUSES = {"available", "reserved", "pickup_scheduled"}
+ACTIVE_LOT_STATUSES = {"available", "published", "reserved", "pickup_scheduled"}
 ACTIVE_OFFER_STATUSES = {"pending", "accepted"}
 ACTIVE_RESERVATION_STATUSES = {"pending", "confirmed"}
 COMPLETED_PICKUP_STATUSES = {"completed", "cancelled", "disputed"}
@@ -8,6 +8,7 @@ COMPLETED_PICKUP_STATUSES = {"completed", "cancelled", "disputed"}
 LOT_STATUSES = {
     "draft",
     "available",
+    "published",
     "reserved",
     "pickup_scheduled",
     "collected",

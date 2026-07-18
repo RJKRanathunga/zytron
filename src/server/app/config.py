@@ -51,6 +51,8 @@ class BaseConfig:
     FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
     FIREBASE_CREDENTIALS_FILE = os.getenv("FIREBASE_CREDENTIALS_FILE", "")
     FIREBASE_CREDENTIALS_JSON = os.getenv("FIREBASE_CREDENTIALS_JSON", "")
+    PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "mock")
+    ENV = os.getenv("FLASK_ENV", "development")
 
 
 class DevelopmentConfig(BaseConfig):

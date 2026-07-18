@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.routes import (
     auth,
     bins,
+    billing,
     collection_points,
     dashboard,
     demand_alerts,
@@ -15,6 +16,7 @@ from app.routes import (
     notifications,
     offers,
     pickups,
+    payments,
     reservations,
     routes,
     transactions,
@@ -27,6 +29,7 @@ API_PREFIX = "/api/v1"
 def register_blueprints(app):
     for blueprint in [
         auth.bp,
+        billing.bp,
         users.bp,
         dashboard.bp,
         materials.bp,
@@ -37,6 +40,7 @@ def register_blueprints(app):
         offers.bp,
         reservations.bp,
         pickups.bp,
+        payments.bp,
         routes.bp,
         demand_alerts.bp,
         transactions.bp,

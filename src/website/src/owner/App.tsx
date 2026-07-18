@@ -8,6 +8,7 @@ import { BinsPage } from './pages/BinsPage'
 import { CollectionPointsPage } from './pages/CollectionPointsPage'
 import { Dashboard } from './pages/Dashboard'
 import { EarningsPage } from './pages/EarningsPage'
+import { BillingPage } from './pages/BillingPage'
 import { ImpactPage } from './pages/ImpactPage'
 import { LotsPage } from './pages/LotsPage'
 import { MessagesPage } from './pages/MessagesPage'
@@ -15,6 +16,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { OffersPage } from './pages/OffersPage'
 import { PickupDetails } from './pages/PickupDetails'
 import { PickupsPage } from './pages/PickupsPage'
+import { PricingPage } from './pages/PricingPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -139,11 +141,29 @@ function App() {
     if (!bin || !compartment || Number.isNaN(pricePerKg) || pricePerKg <= 0) return
 
     void mutate(() => ownerService.publishLot(binId, pricePerKg, pickupWindow), {
-      title: 'Plastic lot published',
-      detail: `${formatKg(compartment.quantityKg)} ${compartment.material} is now visible to collectors.`,
+      title: 'Listing submitted',
+      detail: `${formatKg(compartment.quantityKg)} ${compartment.material} will publish immediately with PRO or wait for FLEX payment.`,
     })
     setPublishOpen(false)
     setPublishBinId(null)
+  }
+
+  const startListingPayment = (lotId: string) => {
+    const lot = lots.find((item) => item.id === lotId)
+    void ownerService
+      .createListingPaymentCheckout(lotId)
+      .then((session) => {
+        showToast({
+          title: 'FLEX checkout ready',
+          detail: `${lot ? `${formatKg(lot.quantityKg)} ${lot.material}` : 'The listing'} is waiting at ${session.checkoutUrl}.`,
+        })
+      })
+      .catch((error) => {
+        showToast({
+          title: 'Checkout failed',
+          detail: error instanceof Error ? error.message : 'The server could not create the checkout.',
+        })
+      })
   }
 
   const withdrawLot = (lotId: string) => {
@@ -273,6 +293,7 @@ function App() {
     openPublishModal,
     openScheduleModal,
     publishLot,
+    startListingPayment,
     withdrawLot,
     acceptOffer,
     rejectOffer,
@@ -296,6 +317,8 @@ function App() {
           <Route path="bins/:binId" element={<BinDetails />} />
           <Route path="collection-points" element={<CollectionPointsPage />} />
           <Route path="lots" element={<LotsPage />} />
+          <Route path="pricing" element={<PricingPage />} />
+          <Route path="billing" element={<BillingPage />} />
           <Route path="offers" element={<OffersPage />} />
           <Route path="pickups" element={<PickupsPage />} />
           <Route path="pickups/:pickupId" element={<PickupDetails />} />

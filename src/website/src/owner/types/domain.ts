@@ -4,7 +4,7 @@ export type MaterialFilter = PlasticMaterial | 'All'
 
 export type BinStatus = 'online' | 'warning' | 'offline'
 
-export type LotStatus = 'draft' | 'published' | 'reserved' | 'withdrawn'
+export type LotStatus = 'draft' | 'payment_pending' | 'published' | 'reserved' | 'withdrawn'
 
 export type OfferStatus = 'new' | 'accepted' | 'rejected'
 
@@ -66,6 +66,77 @@ export interface PlasticLot {
   pickupWindow: string
   publishedAt: string
   views: number
+  paymentRequired?: boolean
+  publicationSource?: 'pro_subscription' | 'flex_payment' | 'admin' | null
+  expiresAt?: string | null
+}
+
+export interface SellerPackage {
+  id: string
+  code: 'ZYTRON_PRO' | 'ZYTRON_FLEX'
+  name: string
+  description: string
+  billingType: 'subscription' | 'per_listing'
+  price: number
+  currency: string
+  billingInterval: string | null
+  listingLimit: number | null
+  isActive: boolean
+}
+
+export interface SellerSubscription {
+  id: string
+  package: SellerPackage
+  status: string
+  provider: string
+  startedAt: string | null
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
+  cancelledAt: string | null
+}
+
+export interface ListingPayment {
+  id: string
+  listingId: string
+  package: SellerPackage
+  amount: number
+  currency: string
+  status: string
+  provider: string
+  providerPaymentId: string | null
+  paidAt: string | null
+  createdAt: string
+}
+
+export interface PaymentTransaction {
+  id: string
+  subscriptionId: string | null
+  listingPaymentId: string | null
+  transactionType: string
+  amount: number
+  currency: string
+  status: string
+  provider: string
+  providerReference: string | null
+  createdAt: string
+}
+
+export interface SellerBilling {
+  currentPackage: SellerPackage | null
+  activeSubscription: SellerSubscription | null
+  publishedListingCount: number
+  draftListingCount: number
+  pendingPaymentCount: number
+  subscriptionHistory: SellerSubscription[]
+  listingPayments: ListingPayment[]
+  paymentHistory: PaymentTransaction[]
+}
+
+export interface CheckoutSession {
+  checkoutUrl: string
+  subscription?: SellerSubscription
+  payment?: ListingPayment
 }
 
 export interface CollectorOffer {

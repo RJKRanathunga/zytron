@@ -23,6 +23,9 @@ class PlasticLot(TimestampMixin, db.Model):
     availability_end = db.Column(db.DateTime(timezone=True))
     status = db.Column(db.String(32), nullable=False, default="available", index=True)
     published_at = db.Column(db.DateTime(timezone=True))
+    expires_at = db.Column(db.DateTime(timezone=True))
+    payment_required = db.Column(db.Boolean, default=False, nullable=False)
+    publication_source = db.Column(db.String(32))
     reserved_at = db.Column(db.DateTime(timezone=True))
     completed_at = db.Column(db.DateTime(timezone=True))
     views = db.Column(db.Integer, default=0, nullable=False)
@@ -36,6 +39,7 @@ class PlasticLot(TimestampMixin, db.Model):
     offers = db.relationship("CollectorOffer", back_populates="lot")
     reservations = db.relationship("Reservation", back_populates="lot")
     pickups = db.relationship("Pickup", back_populates="lot")
+    listing_payments = db.relationship("ListingPayment", back_populates="listing")
 
 
 class CollectorOffer(TimestampMixin, db.Model):

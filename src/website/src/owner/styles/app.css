@@ -1034,6 +1034,7 @@ a {
 .status.confirmed,
 .status.paid,
 .status.active,
+.status.flex,
 .status.saved {
   background: var(--mint-light);
   color: #08755b;
@@ -1261,6 +1262,66 @@ a {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 15px;
+}
+
+.pricing-grid,
+.billing-summary {
+  display: grid;
+  gap: 15px;
+}
+
+.pricing-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.billing-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 17px;
+}
+
+.pricing-plan {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: var(--shadow-soft);
+}
+
+.pricing-plan h2,
+.pricing-plan p {
+  margin: 7px 0;
+}
+
+.pricing-plan h2 {
+  font-size: 25px;
+}
+
+.pricing-plan > strong {
+  display: block;
+  font-size: 19px;
+}
+
+.pricing-plan p,
+.pricing-plan li,
+.page-note {
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.pricing-plan ul {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding-left: 18px;
+}
+
+.page-note {
+  margin: 15px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
 }
 
 .lot {
@@ -2310,6 +2371,8 @@ td small {
 
   .metrics,
   .lot-grid,
+  .pricing-grid,
+  .billing-summary,
   .bin-grid,
   .bin-grid.wide {
     grid-template-columns: repeat(2, 1fr);
@@ -2443,6 +2506,8 @@ td small {
 
   .metrics,
   .lot-grid,
+  .pricing-grid,
+  .billing-summary,
   .bin-grid,
   .bin-grid.wide {
     grid-template-columns: 1fr;

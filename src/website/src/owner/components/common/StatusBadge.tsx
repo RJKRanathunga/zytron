@@ -9,6 +9,8 @@ type BadgeTone =
   | 'ready'
   | 'growing'
   | 'reserved'
+  | 'active'
+  | 'flex'
   | 'warning'
 
 interface StatusBadgeProps {

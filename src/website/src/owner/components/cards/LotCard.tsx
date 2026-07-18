@@ -7,9 +7,10 @@ interface LotCardProps {
   lot: PlasticLot
   bin?: SmartBin
   onWithdraw: (lotId: string) => void
+  onStartPayment?: (lotId: string) => void
 }
 
-export function LotCard({ lot, bin, onWithdraw }: LotCardProps) {
+export function LotCard({ lot, bin, onWithdraw, onStartPayment }: LotCardProps) {
   return (
     <article className="lot">
       <div className="lot-top">
@@ -27,12 +28,22 @@ export function LotCard({ lot, bin, onWithdraw }: LotCardProps) {
         <span>{formatCurrency(lot.pricePerKg)}/kg</span>
         <span>{lot.views} collector views</span>
         <span>{lot.publishedAt}</span>
+        {lot.publicationSource ? <span>{lot.publicationSource.replace('_', ' ')}</span> : null}
       </div>
       <div className="lot-bottom">
-        <span className="supplier">Pickup window: {lot.pickupWindow}</span>
-        <button className="mini-btn" disabled={lot.status === 'withdrawn'} type="button" onClick={() => onWithdraw(lot.id)}>
-          Withdraw
-        </button>
+        <span className="supplier">
+          {lot.paymentRequired ? 'FLEX payment required before publication' : `Pickup window: ${lot.pickupWindow}`}
+        </span>
+        <div className="lot-actions">
+          {lot.paymentRequired && onStartPayment ? (
+            <button className="mini-btn accept" type="button" onClick={() => onStartPayment(lot.id)}>
+              Pay FLEX
+            </button>
+          ) : null}
+          <button className="mini-btn" disabled={lot.status === 'withdrawn'} type="button" onClick={() => onWithdraw(lot.id)}>
+            Withdraw
+          </button>
+        </div>
       </div>
     </article>
   )

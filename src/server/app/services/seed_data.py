@@ -17,6 +17,8 @@ from app.models import (
     MessageThread,
     Notification,
     Organization,
+    Package,
+    SellerSubscription,
     Pickup,
     PlasticLot,
     PlasticMaterial,
@@ -43,6 +45,33 @@ def upsert(model_class, object_id: str, **values):
 
 
 def seed_database():
+    pro_package = upsert(
+        Package,
+        "pkg-zytron-pro",
+        code="ZYTRON_PRO",
+        name="ZYTRON PRO",
+        description="Monthly subscription for regular and high-volume plastic-waste sellers.",
+        billing_type="subscription",
+        price=Decimal("0"),
+        currency="LKR",
+        billing_interval="monthly",
+        listing_limit=None,
+        is_active=True,
+    )
+    upsert(
+        Package,
+        "pkg-zytron-flex",
+        code="ZYTRON_FLEX",
+        name="ZYTRON FLEX",
+        description="Pay separately for each advertisement with no monthly commitment.",
+        billing_type="per_listing",
+        price=Decimal("0"),
+        currency="LKR",
+        billing_interval=None,
+        listing_limit=1,
+        is_active=True,
+    )
+
     materials = {
         "PET": ("Polyethylene terephthalate", "1", "#458ed8"),
         "HDPE": ("High-density polyethylene", "2", "#f2a14a"),
@@ -135,6 +164,21 @@ def seed_database():
         vehicle_capacity_kg=Decimal("0"),
         is_active=True,
         is_verified=True,
+    )
+    active_until = now = datetime.now(timezone.utc)
+    upsert(
+        SellerSubscription,
+        "sub-owner-demo-pro",
+        seller=owner,
+        package=pro_package,
+        status="active",
+        provider="mock",
+        provider_customer_id="mock-customer-owner-demo",
+        provider_subscription_id="mock-sub-owner-demo-pro",
+        started_at=active_until,
+        current_period_start=active_until,
+        current_period_end=active_until.replace(year=active_until.year + 1),
+        cancel_at_period_end=False,
     )
     collector = upsert(
         User,
@@ -293,6 +337,8 @@ def seed_database():
             quality_grade=grade,
             status=status,
             published_at=now,
+            payment_required=False,
+            publication_source="admin",
             reserved_at=now if status == "reserved" else None,
             fill_level=fill,
             demand_score=score,
