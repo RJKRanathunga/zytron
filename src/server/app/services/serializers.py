@@ -11,7 +11,6 @@ from app.models import (
     CollectorOffer,
     DemandAlert,
     DeviceAlert,
-    Dustbin,
     MessageThread,
     Notification,
     ListingPayment,
@@ -250,22 +249,6 @@ def collection_point_for_owner(point: CollectionPoint) -> dict:
     }
 
 
-def dustbin_for_owner(dustbin: Dustbin) -> dict:
-    return {
-        "id": dustbin.id,
-        "name": dustbin.name,
-        "code": dustbin.code,
-        "locationAddress": dustbin.location_address,
-        "latitude": as_float(dustbin.latitude),
-        "longitude": as_float(dustbin.longitude),
-        "supportedPlasticType": dustbin.supported_plastic_type,
-        "description": dustbin.description or "",
-        "isActive": dustbin.is_active,
-        "createdAt": iso(dustbin.created_at),
-        "updatedAt": iso(dustbin.updated_at),
-    }
-
-
 def lot_for_collector(lot: PlasticLot) -> dict:
     point = lot.collection_point
     return {
@@ -299,8 +282,6 @@ def lot_for_owner(lot: PlasticLot) -> dict:
         "material": lot_material_code(lot),
         "title": lot.title,
         "binId": lot.source_compartment.smart_bin_id if lot.source_compartment else "",
-        "dustbinId": lot.dustbin_id or "",
-        "dustbinLabel": lot.dustbin.name if lot.dustbin else "",
         "quantityKg": as_float(lot.estimated_weight_kg),
         "totalWeightKg": as_float(lot.estimated_weight_kg),
         "weightUnit": "kg",
@@ -329,16 +310,30 @@ def compartment_for_owner(compartment: BinCompartment) -> dict:
 
 
 def bin_for_owner(smart_bin: SmartBin) -> dict:
+    status = (
+        "inactive"
+        if smart_bin.status == "disabled"
+        else "warning"
+        if smart_bin.status in {"warning", "maintenance"}
+        else "offline"
+        if smart_bin.status == "offline"
+        else "online"
+    )
     return {
         "id": smart_bin.id,
         "label": smart_bin.name,
+        "deviceCode": smart_bin.device_code,
+        "model": smart_bin.model or "",
         "location": smart_bin.location_label or smart_bin.collection_point.name,
         "collectionPointId": smart_bin.collection_point_id,
-        "status": "warning" if smart_bin.status in {"warning", "maintenance"} else "offline" if smart_bin.status == "offline" else "online",
+        "status": status,
         "batteryPercent": smart_bin.battery_percent,
         "lastSync": "Now" if smart_bin.last_seen_at else "Never",
         "cameraStatus": smart_bin.camera_status,
         "weightSensorStatus": smart_bin.weight_sensor_status,
+        "supportedMaterials": [comp.material.code for comp in smart_bin.compartments if comp.material],
+        "createdAt": iso(smart_bin.created_at),
+        "updatedAt": iso(smart_bin.updated_at),
         "compartments": [compartment_for_owner(comp) for comp in smart_bin.compartments],
     }
 
@@ -503,7 +498,7 @@ def owner_user(user: User) -> dict:
         "name": org_name,
         "initials": initials(org_name),
         "organization": org_name,
-        "subtitle": "Verified dustbin owner",
+        "subtitle": "Verified smart-bin owner",
         "email": user.email,
         "phone": user.phone or "",
         "collectionPointName": point.name if point else org_name,
@@ -545,7 +540,6 @@ def owner_snapshot(user: User) -> dict:
     points = CollectionPoint.query.filter_by(owner_id=user.id, is_active=True).all()
     point_ids = [point.id for point in points]
     bins = SmartBin.query.filter(SmartBin.collection_point_id.in_(point_ids)).all() if point_ids else []
-    dustbins = Dustbin.query.filter_by(owner_id=user.id).order_by(Dustbin.created_at.desc()).all()
     lots = PlasticLot.query.filter_by(owner_id=user.id).order_by(PlasticLot.created_at.desc()).all()
     offers = CollectorOffer.query.join(PlasticLot).filter(PlasticLot.owner_id == user.id).order_by(CollectorOffer.created_at.desc()).all()
     pickups = Pickup.query.filter_by(owner_id=user.id).order_by(Pickup.created_at.desc()).all()
@@ -568,7 +562,6 @@ def owner_snapshot(user: User) -> dict:
         "user": owner_user(user),
         "collectionPoints": [collection_point_for_owner(point) for point in points],
         "smartBins": [bin_for_owner(smart_bin) for smart_bin in bins],
-        "dustbins": [dustbin_for_owner(dustbin) for dustbin in dustbins],
         "lots": [lot_for_owner(lot) for lot in lots],
         "offers": [offer_for_owner(offer) for offer in offers],
         "pickups": [pickup_for_owner(pickup) for pickup in pickups],

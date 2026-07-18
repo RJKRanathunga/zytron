@@ -5,7 +5,6 @@ interface SidebarProps {
   user: OwnerUser
   open: boolean
   binCount: number
-  dustbinCount: number
   offerCount: number
   pickupCount: number
   unreadMessages: number
@@ -19,7 +18,6 @@ const navGroups = [
     items: [
       { to: '/owner/dashboard', icon: 'H', label: 'Overview', end: true },
       { to: '/owner/bins', icon: 'B', label: 'My smart bins', badge: 'bins' },
-      { to: '/owner/dustbins', icon: 'D', label: 'My dustbins', badge: 'dustbins' },
       { to: '/owner/collection-points', icon: 'P', label: 'Collection points' },
       { to: '/owner/lots', icon: 'L', label: 'Plastic lots' },
       { to: '/owner/pricing', icon: 'R', label: 'Pricing' },
@@ -49,7 +47,6 @@ export function Sidebar({
   user,
   open,
   binCount,
-  dustbinCount,
   offerCount,
   pickupCount,
   unreadMessages,
@@ -58,7 +55,6 @@ export function Sidebar({
 }: SidebarProps) {
   const getBadge = (badge?: string) => {
     if (badge === 'bins') return binCount
-    if (badge === 'dustbins') return dustbinCount
     if (badge === 'offers') return offerCount
     if (badge === 'pickups') return pickupCount
     if (badge === 'messages') return unreadMessages

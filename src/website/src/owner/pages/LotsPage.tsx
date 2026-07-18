@@ -12,7 +12,7 @@ export function LotsPage() {
         <div>
           <span className="eyebrow">Available plastic lots</span>
           <h1>Publish, edit or withdraw plastic visible to collectors.</h1>
-          <p>Each lot keeps manually entered plastic weights and can optionally be linked to one of your registered dustbins.</p>
+          <p>Each lot keeps manually entered plastic weights. Smart bins only define the supported plastic types.</p>
         </div>
         <button className="btn primary" type="button" onClick={() => app.openPublishModal()}>
           Publish lot
@@ -32,7 +32,7 @@ export function LotsPage() {
           ))}
         </section>
       ) : (
-        <EmptyState title="No lots published" body="Publish ready plastic from a smart bin to receive collector offers." />
+        <EmptyState title="No lots published" body="Publish a manual plastic breakdown from a smart bin to receive collector offers." />
       )}
     </div>
   )

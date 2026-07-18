@@ -7,12 +7,12 @@ import { formatKg, getBinTotalKg } from '../../utils/format'
 interface BinCardProps {
   bin: SmartBin
   onPublish: (binId: string) => void
+  onEdit?: (binId: string) => void
+  onRemove?: (bin: SmartBin) => void
 }
 
-export function BinCard({ bin, onPublish }: BinCardProps) {
-  const readyCompartment = bin.compartments.find(
-    (compartment) => compartment.status === 'ready' || compartment.fillLevel >= compartment.thresholdLevel,
-  )
+export function BinCard({ bin, onPublish, onEdit, onRemove }: BinCardProps) {
+  const canPublish = bin.status !== 'inactive'
 
   return (
     <article className="bin-card">
@@ -46,7 +46,17 @@ export function BinCard({ bin, onPublish }: BinCardProps) {
       <div className="bin-footer">
         <span>{formatKg(getBinTotalKg(bin))} total</span>
         <span>{bin.lastSync}</span>
-        <button className="mini-btn accept" disabled={!readyCompartment} type="button" onClick={() => onPublish(bin.id)}>
+        {onEdit ? (
+          <button className="mini-btn" type="button" onClick={() => onEdit(bin.id)}>
+            Edit
+          </button>
+        ) : null}
+        {onRemove ? (
+          <button className="mini-btn danger" disabled={bin.status === 'inactive'} type="button" onClick={() => onRemove(bin)}>
+            Remove
+          </button>
+        ) : null}
+        <button className="mini-btn accept" disabled={!canPublish} type="button" onClick={() => onPublish(bin.id)}>
           Publish
         </button>
       </div>

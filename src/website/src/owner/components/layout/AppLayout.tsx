@@ -25,7 +25,6 @@ export function AppLayout({ context, toast }: AppLayoutProps) {
         user={context.user}
         open={mobileOpen}
         binCount={context.smartBins.length}
-        dustbinCount={context.dustbins.length}
         offerCount={activeOffers}
         pickupCount={activePickups}
         unreadMessages={unreadMessages}

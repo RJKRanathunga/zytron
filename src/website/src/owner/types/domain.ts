@@ -4,7 +4,7 @@ export type { PlasticMaterial }
 
 export type MaterialFilter = PlasticMaterial | 'All'
 
-export type BinStatus = 'online' | 'warning' | 'offline'
+export type BinStatus = 'online' | 'warning' | 'offline' | 'inactive'
 
 export type LotStatus = 'draft' | 'payment_pending' | 'published' | 'reserved' | 'withdrawn'
 
@@ -48,6 +48,8 @@ export interface BinCompartment {
 export interface SmartBin {
   id: string
   label: string
+  deviceCode: string
+  model: string
   location: string
   collectionPointId: string
   status: BinStatus
@@ -55,21 +57,10 @@ export interface SmartBin {
   lastSync: string
   cameraStatus: string
   weightSensorStatus: string
-  compartments: BinCompartment[]
-}
-
-export interface Dustbin {
-  id: string
-  name: string
-  code: string
-  locationAddress: string
-  latitude: number
-  longitude: number
-  supportedPlasticType: PlasticMaterial
-  description: string
-  isActive: boolean
+  supportedMaterials: PlasticMaterial[]
   createdAt: string
   updatedAt: string
+  compartments: BinCompartment[]
 }
 
 export interface PlasticLot {
@@ -77,8 +68,6 @@ export interface PlasticLot {
   material: PlasticMaterial
   title: string
   binId: string
-  dustbinId: string
-  dustbinLabel: string
   quantityKg: number
   totalWeightKg: number
   weightUnit: 'kg'
@@ -241,7 +230,6 @@ export interface OwnerSnapshot {
   user: OwnerUser
   collectionPoints: CollectionPoint[]
   smartBins: SmartBin[]
-  dustbins: Dustbin[]
   lots: PlasticLot[]
   offers: CollectorOffer[]
   pickups: Pickup[]

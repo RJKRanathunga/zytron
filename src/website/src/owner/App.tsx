@@ -9,7 +9,6 @@ import { CollectionPointsPage } from './pages/CollectionPointsPage'
 import { Dashboard } from './pages/Dashboard'
 import { EarningsPage } from './pages/EarningsPage'
 import { BillingPage } from './pages/BillingPage'
-import { DustbinsPage } from './pages/DustbinsPage'
 import { ImpactPage } from './pages/ImpactPage'
 import { LotsPage } from './pages/LotsPage'
 import { MessagesPage } from './pages/MessagesPage'
@@ -26,7 +25,6 @@ import type {
   CollectorOffer,
   CollectionPoint,
   DeviceAlert,
-  Dustbin,
   ImpactMetric,
   MaterialFilter,
   MessageThread,
@@ -35,13 +33,14 @@ import type {
   OwnerSortMode,
   OwnerUser,
   Pickup,
+  PlasticMaterial,
   PlasticLot,
   LotPlasticItem,
   SmartBin,
   ToastMessage,
   Transaction,
 } from './types/domain'
-import { formatKg, getReadyCompartments } from './utils/format'
+import { formatKg } from './utils/format'
 
 function App() {
   const navigate = useNavigate()
@@ -50,7 +49,6 @@ function App() {
   const [user, setUser] = useState<OwnerUser | null>(null)
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([])
   const [smartBins, setSmartBins] = useState<SmartBin[]>([])
-  const [dustbins, setDustbins] = useState<Dustbin[]>([])
   const [lots, setLots] = useState<PlasticLot[]>([])
   const [offers, setOffers] = useState<CollectorOffer[]>([])
   const [pickups, setPickups] = useState<Pickup[]>([])
@@ -74,7 +72,6 @@ function App() {
     setUser(snapshot.user)
     setCollectionPoints(snapshot.collectionPoints)
     setSmartBins(snapshot.smartBins)
-    setDustbins(snapshot.dustbins ?? [])
     setLots(snapshot.lots)
     setOffers(snapshot.offers)
     setPickups(snapshot.pickups)
@@ -129,10 +126,10 @@ function App() {
   }
 
   const openPublishModal = (binId?: string) => {
-    const fallbackBin = getReadyCompartments(smartBins)[0]?.bin
+    const fallbackBin = smartBins.find((bin) => bin.status !== 'inactive')
     const selectedBin = binId ? smartBins.find((bin) => bin.id === binId) : fallbackBin
-    if (!selectedBin) {
-      showToast({ title: 'No ready plastic', detail: 'No bin compartment has crossed its publication threshold.' })
+    if (!selectedBin || selectedBin.status === 'inactive') {
+      showToast({ title: 'No smart bin selected', detail: 'Add a smart bin before publishing a lot.' })
       return
     }
     setPublishBinId(selectedBin.id)
@@ -141,12 +138,12 @@ function App() {
 
   const plasticItemsTotal = (items: LotPlasticItem[]) => items.reduce((total, item) => total + item.weight, 0)
 
-  const publishLot = (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[], dustbinId?: string) => {
+  const publishLot = (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => {
     const bin = smartBins.find((item) => item.id === binId)
     const totalKg = plasticItemsTotal(plasticItems)
     if (!bin || Number.isNaN(pricePerKg) || pricePerKg <= 0 || totalKg <= 0) return
 
-    void mutate(() => ownerService.publishLot(binId, pricePerKg, pickupWindow, plasticItems, dustbinId), {
+    void mutate(() => ownerService.publishLot(binId, pricePerKg, pickupWindow, plasticItems), {
       title: 'Listing submitted',
       detail: `${formatKg(totalKg)} manual plastic breakdown will publish immediately with PRO or wait for FLEX payment.`,
     })
@@ -154,58 +151,45 @@ function App() {
     setPublishBinId(null)
   }
 
-  const createDustbin = (input: {
-    name: string
-    code: string
-    locationAddress: string
-    latitude: number
-    longitude: number
-    supportedPlasticType: Dustbin['supportedPlasticType']
-    description: string
-    isActive: boolean
+  const createSmartBin = (input: {
+    collectionPointId: string
+    label: string
+    deviceCode: string
+    location: string
+    model: string
+    status: 'online' | 'warning' | 'offline' | 'inactive'
+    supportedMaterials: PlasticMaterial[]
   }) => {
-    return mutate(() => ownerService.createDustbin(input), {
-      title: 'Dustbin added',
-      detail: `${input.name} is now available for lot linking.`,
+    return mutate(() => ownerService.createSmartBin(input), {
+      title: 'Smart bin added',
+      detail: `${input.label} now supports ${input.supportedMaterials.join(', ')}.`,
     })
   }
 
-  const updateDustbin = (
-    dustbinId: string,
+  const updateSmartBin = (
+    binId: string,
     input: {
-      name: string
-      code: string
-      locationAddress: string
-      latitude: number
-      longitude: number
-      supportedPlasticType: Dustbin['supportedPlasticType']
-      description: string
-      isActive: boolean
+      collectionPointId: string
+      label: string
+      deviceCode: string
+      location: string
+      model: string
+      status: 'online' | 'warning' | 'offline' | 'inactive'
+      supportedMaterials: PlasticMaterial[]
     },
   ) => {
-    return mutate(() => ownerService.updateDustbin(dustbinId, input), {
-      title: 'Dustbin saved',
-      detail: `${input.name} details were updated.`,
+    return mutate(() => ownerService.updateSmartBin(binId, input), {
+      title: 'Smart bin saved',
+      detail: `${input.label} details were updated.`,
     })
   }
 
-  const deleteDustbin = (dustbinId: string) => {
-    const dustbin = dustbins.find((item) => item.id === dustbinId)
-    return ownerService
-      .deleteDustbin(dustbinId)
-      .then(({ snapshot, message }) => {
-        applySnapshot(snapshot)
-        showToast({
-          title: message ? 'Dustbin marked inactive' : 'Dustbin removed',
-          detail: message ?? `${dustbin?.name ?? 'Selected dustbin'} was removed from your owner account.`,
-        })
-      })
-      .catch((error) => {
-        showToast({
-          title: 'Action failed',
-          detail: error instanceof Error ? error.message : 'The server could not remove this dustbin.',
-        })
-      })
+  const removeSmartBin = (binId: string) => {
+    const bin = smartBins.find((item) => item.id === binId)
+    return mutate(() => ownerService.removeSmartBin(binId), {
+      title: 'Smart bin inactive',
+      detail: `${bin?.label ?? 'Selected smart bin'} was marked inactive.`,
+    })
   }
 
   const openEditLotModal = (lotId: string) => {
@@ -305,7 +289,6 @@ function App() {
       setUser(null)
       setCollectionPoints([])
       setSmartBins([])
-      setDustbins([])
       setLots([])
       setOffers([])
       setPickups([])
@@ -346,7 +329,6 @@ function App() {
     user,
     collectionPoints,
     smartBins,
-    dustbins,
     lots,
     offers,
     pickups,
@@ -371,9 +353,9 @@ function App() {
     openScheduleModal,
     publishLot,
     updateLot,
-    createDustbin,
-    updateDustbin,
-    deleteDustbin,
+    createSmartBin,
+    updateSmartBin,
+    removeSmartBin,
     startListingPayment,
     withdrawLot,
     acceptOffer,
@@ -397,7 +379,6 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="bins" element={<BinsPage />} />
           <Route path="bins/:binId" element={<BinDetails />} />
-          <Route path="dustbins" element={<DustbinsPage />} />
           <Route path="collection-points" element={<CollectionPointsPage />} />
           <Route path="lots" element={<LotsPage />} />
           <Route path="pricing" element={<PricingPage />} />
@@ -417,7 +398,6 @@ function App() {
         publishBin={publishBin}
         scheduleOffer={scheduleOffer}
         lots={lots}
-        dustbins={dustbins}
         isPublishOpen={isPublishOpen}
         onClose={() => {
           setPublishOpen(false)

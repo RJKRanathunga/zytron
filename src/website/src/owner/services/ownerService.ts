@@ -1,6 +1,6 @@
 import { apiRequest } from '../../services/apiClient'
 import { authService } from '../../auth/authService'
-import type { Dustbin, LotPlasticItem, OwnerSnapshot } from '../types/domain'
+import type { LotPlasticItem, OwnerSnapshot, PlasticMaterial } from '../types/domain'
 import type { CheckoutSession, SellerBilling, SellerPackage } from '../types/domain'
 
 export interface OwnerService {
@@ -9,11 +9,11 @@ export interface OwnerService {
   loadSnapshot: () => Promise<OwnerSnapshot>
   loadPackages: () => Promise<SellerPackage[]>
   loadBilling: () => Promise<SellerBilling>
-  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[], dustbinId?: string) => Promise<OwnerSnapshot>
+  publishLot: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => Promise<OwnerSnapshot>
   updateLot: (lotId: string, input: LotUpdateInput) => Promise<OwnerSnapshot>
-  createDustbin: (input: DustbinInput) => Promise<OwnerSnapshot>
-  updateDustbin: (dustbinId: string, input: DustbinInput) => Promise<OwnerSnapshot>
-  deleteDustbin: (dustbinId: string) => Promise<{ snapshot: OwnerSnapshot; message?: string }>
+  createSmartBin: (input: SmartBinInput) => Promise<OwnerSnapshot>
+  updateSmartBin: (binId: string, input: SmartBinInput) => Promise<OwnerSnapshot>
+  removeSmartBin: (binId: string) => Promise<OwnerSnapshot>
   createSubscriptionCheckout: () => Promise<CheckoutSession>
   cancelSubscription: () => Promise<SellerBilling>
   createListingPaymentCheckout: (lotId: string) => Promise<CheckoutSession>
@@ -41,18 +41,16 @@ export interface OwnerProfileUpdate {
 export interface LotUpdateInput {
   pricePerKg: number
   plasticItems: LotPlasticItem[]
-  dustbinId?: string
 }
 
-export interface DustbinInput {
-  name: string
-  code: string
-  locationAddress: string
-  latitude: number
-  longitude: number
-  supportedPlasticType: Dustbin['supportedPlasticType']
-  description: string
-  isActive: boolean
+export interface SmartBinInput {
+  collectionPointId: string
+  label: string
+  deviceCode: string
+  location: string
+  model: string
+  status: 'online' | 'warning' | 'offline' | 'inactive'
+  supportedMaterials: PlasticMaterial[]
 }
 
 async function reloadSnapshot(): Promise<OwnerSnapshot> {
@@ -70,10 +68,10 @@ export const ownerService: OwnerService = {
 
   loadBilling: () => apiRequest<SellerBilling>('/seller/billing'),
 
-  publishLot: async (binId, pricePerKg, pickupWindow, plasticItems, dustbinId) => {
+  publishLot: async (binId, pricePerKg, pickupWindow, plasticItems) => {
     await apiRequest('/lots', {
       method: 'POST',
-      body: JSON.stringify({ binId, pricePerKg, pickupWindow, plasticItems, dustbinId }),
+      body: JSON.stringify({ binId, pricePerKg, pickupWindow, plasticItems }),
     })
     return reloadSnapshot()
   },
@@ -86,27 +84,25 @@ export const ownerService: OwnerService = {
     return reloadSnapshot()
   },
 
-  createDustbin: async (input) => {
-    await apiRequest('/owner/dustbins', {
+  createSmartBin: async (input) => {
+    await apiRequest('/bins', {
       method: 'POST',
       body: JSON.stringify(input),
     })
     return reloadSnapshot()
   },
 
-  updateDustbin: async (dustbinId, input) => {
-    await apiRequest(`/owner/dustbins/${dustbinId}`, {
-      method: 'PUT',
+  updateSmartBin: async (binId, input) => {
+    await apiRequest(`/bins/${binId}`, {
+      method: 'PATCH',
       body: JSON.stringify(input),
     })
     return reloadSnapshot()
   },
 
-  deleteDustbin: async (dustbinId) => {
-    const result = await apiRequest<{ deleted: boolean; inactive?: boolean; message?: string }>(`/owner/dustbins/${dustbinId}`, {
-      method: 'DELETE',
-    })
-    return { snapshot: await reloadSnapshot(), message: result.message }
+  removeSmartBin: async (binId) => {
+    await apiRequest(`/bins/${binId}`, { method: 'DELETE' })
+    return reloadSnapshot()
   },
 
   createSubscriptionCheckout: () => apiRequest<CheckoutSession>('/seller/subscription/checkout', { method: 'POST' }),

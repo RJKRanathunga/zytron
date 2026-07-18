@@ -477,15 +477,15 @@ def seed_database():
 
     for alert_id, bin_id, title, severity, message in [
         ("device-alert-a02", "bin-a-02", "Weight sensor check suggested", "warning", "HDPE bin A-02 has a sensor drift warning after the last sync."),
-        ("device-alert-a03", "bin-a-03", "PP threshold reached", "info", "A-03 passed the publication threshold and is ready for offers."),
+        ("device-alert-a03", "bin-a-03", "PP stream checked", "info", "A-03 has a PP stream configured for manual lot publishing."),
     ]:
         upsert(DeviceAlert, alert_id, smart_bin_id=bin_id, title=title, severity=severity, alert_type="device", message=message, is_resolved=False)
 
     for note_id, note_user, note_type, title, message, is_read in [
-        ("note-owner-offer", owner, "offer", "New collector offer", "GreenNova offered Rs. 3,210 for the ready PP lot.", False),
-        ("note-owner-bin", owner, "bin", "PP bin is ready", "Smart Bin A-03 crossed the pickup threshold.", False),
+        ("note-owner-offer", owner, "offer", "New collector offer", "GreenNova offered Rs. 3,210 for the published PP lot.", False),
+        ("note-owner-bin", owner, "bin", "PP bin stream updated", "Smart Bin A-03 has a PP stream available for manual lot publishing.", False),
         ("note-collector-route", collector, "route", "Route planner ready", "Add selected PP lots to calculate distance and travel time with Google Routes.", False),
-        ("note-collector-pet", collector, "supply", "New PET lot nearby", "Katubedda Supermarket has 41 kg ready for pickup.", False),
+        ("note-collector-pet", collector, "supply", "New PET lot nearby", "Katubedda Supermarket published 41 kg for pickup.", False),
     ]:
         upsert(Notification, note_id, user=note_user, type=note_type, title=title, message=message, is_read=is_read, resource_type="seed", resource_id="seed")
 

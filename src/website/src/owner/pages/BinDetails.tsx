@@ -18,14 +18,14 @@ export function BinDetails() {
         <div>
           <span className="eyebrow">Bin details</span>
           <h1>{bin.label}</h1>
-          <p>{bin.location} bin details, plastic compartments and device status.</p>
+          <p>{bin.location} smart-bin details, supported plastic types and device status.</p>
         </div>
         <div className="heading-actions">
           <button className="btn secondary" type="button" onClick={() => navigate('/owner/bins')}>
             Back to bins
           </button>
-          <button className="btn primary" type="button" onClick={() => app.openPublishModal(bin.id)}>
-            Publish ready plastic
+          <button className="btn primary" disabled={bin.status === 'inactive'} type="button" onClick={() => app.openPublishModal(bin.id)}>
+            Publish lot
           </button>
         </div>
       </section>
@@ -34,7 +34,7 @@ export function BinDetails() {
           <div className="panel-heading">
             <div>
               <span className="eyebrow">Compartments</span>
-              <h3>Plastic compartments</h3>
+              <h3>Supported plastic types</h3>
             </div>
             <StatusBadge label={bin.status} tone={bin.status} />
           </div>
@@ -44,7 +44,7 @@ export function BinDetails() {
                 <MaterialBadge material={compartment.material} />
                 <div>
                   <strong>{compartment.material} compartment</strong>
-                  <small>{formatKg(compartment.quantityKg)} measured plastic</small>
+                  <small>{formatKg(compartment.quantityKg)} current compartment record</small>
                   <div className="progress">
                     <i style={{ width: `${compartment.fillLevel}%` }}></i>
                   </div>

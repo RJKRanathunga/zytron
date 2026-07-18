@@ -15,7 +15,6 @@ from app.models import (
     CollectorOffer,
     DemandAlert,
     DeviceAlert,
-    Dustbin,
     Message,
     MessageThread,
     Notification,
@@ -493,18 +492,11 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     ensure_owner(user)
     bin_id = payload.get("binId") or payload.get("bin_id")
     compartment_id = payload.get("compartmentId") or payload.get("compartment_id")
-    dustbin_id = payload.get("dustbinId") or payload.get("dustbin_id")
     compartment: BinCompartment | None = None
     point: CollectionPoint | None = None
-    dustbin: Dustbin | None = None
+    smart_bin: SmartBin | None = None
     allowed_material_codes: set[str] | None = None
-
-    if dustbin_id:
-        dustbin = get_or_404(Dustbin, dustbin_id, "The requested dustbin was not found.")
-        if dustbin.owner_id != user.id:
-            raise ResourceNotFound("The requested dustbin was not found.")
-        if not dustbin.is_active:
-            raise InvalidState("Inactive dustbins cannot be linked to new lots.")
+    explicit_compartment = bool(compartment_id)
 
     if compartment_id:
         compartment = get_or_404(BinCompartment, compartment_id, "The requested compartment was not found.")
@@ -513,19 +505,27 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     elif bin_id:
         smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
         point = smart_bin.collection_point
-        compartment = (
-            BinCompartment.query.filter_by(smart_bin_id=smart_bin.id, status="ready").order_by(BinCompartment.id.asc()).first()
-            or BinCompartment.query.filter_by(smart_bin_id=smart_bin.id).order_by(BinCompartment.id.asc()).first()
-        )
         allowed_material_codes = {item.material.code for item in smart_bin.compartments if item.material}
     elif payload.get("collection_point_id"):
         point = get_or_404(CollectionPoint, payload["collection_point_id"], "The requested collection point was not found.")
 
     if not point or point.owner_id != user.id:
         raise ResourceNotFound("The requested collection inventory was not found.")
+    if smart_bin and smart_bin.status == "disabled":
+        raise InvalidState("Activate this smart bin before publishing a lot.")
+    if smart_bin and not allowed_material_codes:
+        raise InvalidState("Add at least one supported plastic type to this smart bin before publishing a lot.")
+
+    plastic_items, quantity, material = validate_lot_plastic_items(payload, allowed_material_codes)
+    if smart_bin and not compartment:
+        item_codes = [item["plastic_type"] for item in plastic_items]
+        compartment = next(
+            (comp for code in item_codes for comp in smart_bin.compartments if comp.material and comp.material.code == code),
+            None,
+        )
 
     existing_active = None
-    if compartment:
+    if explicit_compartment and compartment:
         existing_active = PlasticLot.query.filter(
             PlasticLot.source_compartment_id == compartment.id,
             PlasticLot.status.in_(["available", "published", "reserved", "pickup_scheduled"]),
@@ -533,7 +533,6 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
     if existing_active:
         raise Conflict("inventory_already_published", "This compartment already has an active lot.")
 
-    plastic_items, quantity, material = validate_lot_plastic_items(payload, allowed_material_codes)
     price = positive_decimal(payload.get("pricePerKg") or payload.get("price_per_kg"), "pricePerKg")
 
     pickup_window = payload.get("pickupWindow") or payload.get("pickup_window") or "Flexible pickup"
@@ -544,7 +543,6 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
         collection_point=point,
         material=material,
         source_compartment=compartment,
-        dustbin=dustbin,
         title=title,
         description=payload.get("description") or f"{title} from {point.name}",
         estimated_weight_kg=quantity,
@@ -554,7 +552,7 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
         availability_start=utc_now(),
         status="draft",
         payment_required=True,
-        fill_level=int(min(100, max(0, as_float(compartment.fill_percentage) if compartment else 80))),
+        fill_level=80,
         demand_score=90,
     )
     lot.description = f"{lot.description}\nPlastic breakdown: {breakdown_label}" if breakdown_label else lot.description
@@ -562,7 +560,7 @@ def publish_lot(user: User, payload: dict) -> PlasticLot:
         lot.description = f"{lot.description}\nPickup window: {pickup_window}"
     db.session.add(lot)
     replace_lot_plastic_items(lot, plastic_items)
-    if compartment:
+    if explicit_compartment and compartment:
         compartment.status = "reserved"
     db.session.flush()
     from app.services.subscriptions import can_publish_listing

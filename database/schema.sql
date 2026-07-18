@@ -98,24 +98,6 @@ CREATE TABLE IF NOT EXISTS collection_points (
   CONSTRAINT ck_collection_points_handovers_nonnegative CHECK (handovers >= 0)
 );
 
-CREATE TABLE IF NOT EXISTS dustbins (
-  id VARCHAR(64) PRIMARY KEY,
-  owner_id VARCHAR(64) NOT NULL REFERENCES users(id),
-  name VARCHAR(120) NOT NULL,
-  code VARCHAR(80) NOT NULL,
-  location_address VARCHAR(255) NOT NULL,
-  latitude NUMERIC(10, 7) NOT NULL,
-  longitude NUMERIC(10, 7) NOT NULL,
-  supported_plastic_type VARCHAR(32) NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT uq_dustbins_owner_code UNIQUE (owner_id, code),
-  CONSTRAINT ck_dustbins_latitude CHECK (latitude BETWEEN -90 AND 90),
-  CONSTRAINT ck_dustbins_longitude CHECK (longitude BETWEEN -180 AND 180)
-);
-
 CREATE TABLE IF NOT EXISTS smart_bins (
   id VARCHAR(64) PRIMARY KEY,
   collection_point_id VARCHAR(64) NOT NULL REFERENCES collection_points(id),
@@ -175,7 +157,6 @@ CREATE TABLE IF NOT EXISTS plastic_lots (
   collection_point_id VARCHAR(64) NOT NULL REFERENCES collection_points(id),
   material_id VARCHAR(64) NOT NULL REFERENCES plastic_materials(id),
   source_compartment_id VARCHAR(64) REFERENCES bin_compartments(id),
-  dustbin_id VARCHAR(64) REFERENCES dustbins(id),
   title VARCHAR(180) NOT NULL,
   description TEXT,
   estimated_weight_kg NUMERIC(10, 2) NOT NULL,
@@ -497,9 +478,6 @@ CREATE INDEX IF NOT EXISTS ix_users_role ON users (role);
 CREATE INDEX IF NOT EXISTS ix_collection_points_district ON collection_points (district);
 CREATE INDEX IF NOT EXISTS ix_collection_points_organization_id ON collection_points (organization_id);
 CREATE INDEX IF NOT EXISTS ix_collection_points_owner_id ON collection_points (owner_id);
-CREATE INDEX IF NOT EXISTS ix_dustbins_code ON dustbins (code);
-CREATE INDEX IF NOT EXISTS ix_dustbins_is_active ON dustbins (is_active);
-CREATE INDEX IF NOT EXISTS ix_dustbins_owner_id ON dustbins (owner_id);
 CREATE INDEX IF NOT EXISTS ix_smart_bins_collection_point_id ON smart_bins (collection_point_id);
 CREATE INDEX IF NOT EXISTS ix_smart_bins_status ON smart_bins (status);
 CREATE INDEX IF NOT EXISTS ix_bin_compartments_material_id ON bin_compartments (material_id);
@@ -512,7 +490,6 @@ CREATE INDEX IF NOT EXISTS ix_plastic_lots_collection_point_id ON plastic_lots (
 CREATE INDEX IF NOT EXISTS ix_plastic_lots_material_id ON plastic_lots (material_id);
 CREATE INDEX IF NOT EXISTS ix_plastic_lots_owner_id ON plastic_lots (owner_id);
 CREATE INDEX IF NOT EXISTS ix_plastic_lots_source_compartment_id ON plastic_lots (source_compartment_id);
-CREATE INDEX IF NOT EXISTS ix_plastic_lots_dustbin_id ON plastic_lots (dustbin_id);
 CREATE INDEX IF NOT EXISTS ix_plastic_lots_status ON plastic_lots (status);
 CREATE INDEX IF NOT EXISTS ix_lot_plastic_items_lot_id ON lot_plastic_items (lot_id);
 CREATE INDEX IF NOT EXISTS ix_lot_plastic_items_plastic_type ON lot_plastic_items (plastic_type);

@@ -16,12 +16,5 @@ export const formatPlasticBreakdown = (lot: PlasticLot) =>
 
 export const getBinForLot = (lot: PlasticLot, bins: SmartBin[]) => bins.find((bin) => bin.id === lot.binId)
 
-export const getReadyCompartments = (bins: SmartBin[]) =>
-  bins.flatMap((bin) =>
-    bin.compartments
-      .filter((compartment) => compartment.fillLevel >= compartment.thresholdLevel || compartment.status === 'ready')
-      .map((compartment) => ({ bin, compartment })),
-  )
-
 export const getBinTotalKg = (bin: SmartBin) =>
   bin.compartments.reduce((total, compartment) => total + compartment.quantityKg, 0)

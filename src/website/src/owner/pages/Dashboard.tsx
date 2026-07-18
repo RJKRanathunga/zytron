@@ -5,14 +5,14 @@ import { OfferCard } from '../components/cards/OfferCard'
 import { PickupCard } from '../components/cards/PickupCard'
 import { CollectionPointMap } from '../components/maps/CollectionPointMap'
 import { useOwnerApp } from '../hooks/useOwnerApp'
-import { formatCurrency, formatKg, getReadyCompartments } from '../utils/format'
+import { formatCurrency, formatKg } from '../utils/format'
 
 export function Dashboard() {
   const app = useOwnerApp()
   const navigate = useNavigate()
-  const ready = getReadyCompartments(app.smartBins)
-  const totalKg = app.smartBins.flatMap((bin) => bin.compartments).reduce((total, compartment) => total + compartment.quantityKg, 0)
-  const readyKg = ready.reduce((total, item) => total + item.compartment.quantityKg, 0)
+  const activeBins = app.smartBins.filter((bin) => bin.status !== 'inactive')
+  const manualLotKg = app.lots.reduce((total, lot) => total + lot.quantityKg, 0)
+  const supportedStreams = activeBins.flatMap((bin) => bin.compartments).length
   const earnings = app.transactions.reduce((total, transaction) => total + transaction.amount, 0)
   const bestOffer = app.offers.sort((first, second) => second.price - first.price)[0]
 
@@ -22,14 +22,11 @@ export function Dashboard() {
         <div>
           <span className="eyebrow">Friday, 17 July - Owner workspace</span>
           <h1>Good morning, {app.user.organization}</h1>
-          <p>Your dashboard keeps bins available, turns ready plastic into income and coordinates smooth pickups.</p>
+          <p>Your dashboard keeps smart bins available, publishes manual lot weights and coordinates smooth pickups.</p>
         </div>
         <div className="heading-actions">
           <button className="btn secondary" type="button" onClick={() => navigate('/owner/bins')}>
             Manage bins
-          </button>
-          <button className="btn secondary" type="button" onClick={() => navigate('/owner/dustbins')}>
-            My Dustbins
           </button>
           <button className="btn primary" type="button" onClick={() => navigate('/owner/offers')}>
             Review {app.offers.filter((offer) => offer.status === 'new').length} offers
@@ -40,14 +37,14 @@ export function Dashboard() {
       <section className="hero">
         <div className="hero-copy">
           <span className="hero-badge">Priority action</span>
-          <h2>Your PP plastic lot is ready to be listed - publish it and connect with interested collectors.</h2>
+          <h2>Publish a plastic lot manually from one of your active smart bins.</h2>
           <p>
-            Enter the PP lot weight manually before publishing or compare current offers. The strongest offer is{' '}
+            Choose the supported plastic types, enter each weight yourself and compare current offers. The strongest offer is{' '}
             {formatCurrency(bestOffer?.price ?? 0)} with pickup available tomorrow morning.
           </p>
           <div className="hero-actions">
-            <button className="btn light" type="button" onClick={() => app.openPublishModal('bin-a-03')}>
-              Publish PP lot
+            <button className="btn light" type="button" onClick={() => app.openPublishModal()}>
+              Publish lot
             </button>
             <button className="btn ghost" type="button" onClick={() => navigate('/owner/offers')}>
               Compare offers
@@ -86,10 +83,10 @@ export function Dashboard() {
       </section>
 
       <section className="metrics">
-        <MetricCard tone="mint" icon="P" label="Plastic collected" value={formatKg(totalKg)} detail="18% above last month" />
-        <MetricCard tone="sun" icon="R" label="Ready for pickup" value={formatKg(readyKg)} detail={`${ready.length} publishable lots`} />
+        <MetricCard tone="mint" icon="P" label="Manual lot weight" value={formatKg(manualLotKg)} detail="From owner-published lots" />
+        <MetricCard tone="sun" icon="S" label="Supported streams" value={String(supportedStreams)} detail="Plastic types registered on active bins" />
         <MetricCard tone="violet" icon="$" label="Owner earnings" value={formatCurrency(earnings)} detail="Rs. 3,210 pending" />
-        <MetricCard tone="coral" icon="B" label="Smart bin health" value="3 / 4" detail="1 sensor check suggested" />
+        <MetricCard tone="coral" icon="B" label="Smart bin health" value={`${activeBins.length} / ${app.smartBins.length}`} detail="Active smart bins" />
       </section>
 
       <section className="grid-main">
@@ -159,32 +156,6 @@ export function Dashboard() {
         <article className="panel">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">My Dustbins</span>
-              <h3>Registered owner dustbins</h3>
-            </div>
-            <button className="text-btn" type="button" onClick={() => navigate('/owner/dustbins')}>
-              Manage
-            </button>
-          </div>
-          <div className="dustbin-list compact">
-            {app.dustbins.slice(0, 4).map((dustbin) => (
-              <button className="dustbin-card" key={dustbin.id} type="button" onClick={() => navigate('/owner/dustbins')}>
-                <span className="demand-icon">{dustbin.supportedPlasticType}</span>
-                <span>
-                  <strong>{dustbin.name}</strong>
-                  <small>{dustbin.code} - {dustbin.locationAddress}</small>
-                </span>
-                <i className={`status ${dustbin.isActive ? 'online' : 'withdrawn'}`}>{dustbin.isActive ? 'active' : 'inactive'}</i>
-              </button>
-            ))}
-            {app.dustbins.length === 0 ? (
-              <div className="page-note">No registered dustbins yet. Add one before linking a lot to a dustbin.</div>
-            ) : null}
-          </div>
-        </article>
-        <article className="panel">
-          <div className="panel-heading">
-            <div>
               <span className="eyebrow">Device health</span>
               <h3>Smart-bin alerts</h3>
             </div>
@@ -207,7 +178,7 @@ export function Dashboard() {
         </article>
         <article className="impact-card">
           <span className="eyebrow light">Positive community impact</span>
-          <h3>Every ready bin keeps plastic in the recovery loop.</h3>
+          <h3>Every published lot keeps plastic in the recovery loop.</h3>
           <p>Environmental stories live in the dedicated impact page while this dashboard stays action-focused.</p>
           <div className="impact-stats">
             {app.impactMetrics.slice(0, 2).map((metric) => (

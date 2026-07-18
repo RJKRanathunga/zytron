@@ -22,6 +22,77 @@ def ensure_bin_owner(user, smart_bin: SmartBin):
         raise ResourceNotFound("The requested bin was not found.")
 
 
+def material_values(payload: dict) -> list[str]:
+    values = (
+        payload.get("supportedMaterials")
+        or payload.get("supported_materials")
+        or payload.get("plasticTypes")
+        or payload.get("plastic_types")
+        or payload.get("materials")
+        or []
+    )
+    if isinstance(values, str):
+        values = [values]
+    if not isinstance(values, list):
+        raise ApiError("validation_error", "supportedMaterials must be a list.", 400, {"supportedMaterials": ["Must be a list."]})
+    return [str(value).strip().upper() for value in values if str(value).strip()]
+
+
+def load_supported_materials(payload: dict) -> list[PlasticMaterial]:
+    values = material_values(payload)
+    if not values:
+        raise ApiError(
+            "validation_error",
+            "At least one supported plastic type is required.",
+            400,
+            {"supportedMaterials": ["Select at least one plastic type."]},
+        )
+    materials: list[PlasticMaterial] = []
+    seen: set[str] = set()
+    for value in values:
+        material = PlasticMaterial.query.filter((PlasticMaterial.code == value) | (PlasticMaterial.id == value)).first()
+        if not material:
+            raise ApiError("validation_error", "Unknown plastic type.", 400, {"supportedMaterials": [f"{value} is not supported."]})
+        if material.code not in seen:
+            seen.add(material.code)
+            materials.append(material)
+    return materials
+
+
+def sync_compartments(smart_bin: SmartBin, materials: list[PlasticMaterial], capacity_kg: Decimal | None = None):
+    capacity = capacity_kg or Decimal("100")
+    existing_by_code = {compartment.material.code: compartment for compartment in smart_bin.compartments if compartment.material}
+    wanted_codes = {material.code for material in materials}
+    for material in materials:
+        if material.code not in existing_by_code:
+            smart_bin.compartments.append(
+                BinCompartment(
+                    material=material,
+                    capacity_kg=capacity,
+                    current_weight_kg=Decimal("0"),
+                    fill_percentage=Decimal("0"),
+                    threshold_percentage=Decimal("80"),
+                    status="growing",
+                )
+            )
+    for compartment in list(smart_bin.compartments):
+        if compartment.material and compartment.material.code not in wanted_codes:
+            if any(lot.status in {"available", "published", "reserved", "pickup_scheduled"} for lot in compartment.lots):
+                continue
+            db.session.delete(compartment)
+
+
+def normalize_bin_status(value: str | None) -> str:
+    status = (value or "online").strip().lower()
+    if status == "active":
+        return "online"
+    if status == "inactive":
+        return "disabled"
+    if status not in {"online", "offline", "maintenance", "warning", "disabled"}:
+        raise ApiError("validation_error", "Unknown smart bin status.", 400, {"status": ["Choose a valid status."]})
+    return status
+
+
 @bp.get("")
 def list_bins():
     user = current_user()
@@ -39,20 +110,26 @@ def create_bin():
     user = current_user()
     ensure_owner(user)
     payload = request.get_json() or {}
-    point = get_or_404(CollectionPoint, payload.get("collection_point_id", ""), "The requested collection point was not found.")
+    point_id = payload.get("collection_point_id") or payload.get("collectionPointId")
+    point = get_or_404(CollectionPoint, point_id or "", "The requested collection point was not found.")
     if point.owner_id != user.id:
         raise ResourceNotFound("The requested collection point was not found.")
+    materials = load_supported_materials(payload)
     smart_bin = SmartBin(
         collection_point=point,
         device_code=payload.get("device_code") or payload.get("deviceCode"),
         name=payload.get("name") or payload.get("label") or "Smart Bin",
         model=payload.get("model") or "PolyLoop S1",
-        status=payload.get("status") or "online",
-        location_label=payload.get("location_label") or payload.get("location") or point.name,
+        status=normalize_bin_status(payload.get("status")),
+        location_label=payload.get("location_label") or payload.get("locationLabel") or payload.get("location") or point.name,
+        battery_percent=payload.get("battery_percent") or payload.get("batteryPercent") or 88,
+        camera_status=payload.get("camera_status") or payload.get("cameraStatus") or "Manual entry",
+        weight_sensor_status=payload.get("weight_sensor_status") or payload.get("weightSensorStatus") or "Manual entry",
     )
     if not smart_bin.device_code:
         raise ApiError("validation_error", "A device code is required.", 400, {"device_code": ["Missing data for required field."]})
     db.session.add(smart_bin)
+    sync_compartments(smart_bin, materials)
     db.session.commit()
     return data_response(bin_for_owner(smart_bin), 201)
 
@@ -67,14 +144,31 @@ def get_bin(bin_id: str):
 
 
 @bp.patch("/<bin_id>")
+@bp.put("/<bin_id>")
 def update_bin(bin_id: str):
     user = current_user()
     smart_bin = get_or_404(SmartBin, bin_id, "The requested bin was not found.")
     ensure_bin_owner(user, smart_bin)
     payload = request.get_json() or {}
-    for key in ["name", "model", "status", "firmware_version", "location_label", "battery_percent", "camera_status", "weight_sensor_status"]:
+    alias_map = {
+        "label": "name",
+        "location": "location_label",
+        "locationLabel": "location_label",
+        "deviceCode": "device_code",
+        "batteryPercent": "battery_percent",
+        "cameraStatus": "camera_status",
+        "weightSensorStatus": "weight_sensor_status",
+    }
+    for source, target in alias_map.items():
+        if source in payload:
+            payload[target] = payload[source]
+    if "status" in payload:
+        payload["status"] = normalize_bin_status(payload.get("status"))
+    for key in ["name", "device_code", "model", "status", "firmware_version", "location_label", "battery_percent", "camera_status", "weight_sensor_status"]:
         if key in payload:
             setattr(smart_bin, key, payload[key])
+    if any(key in payload for key in ["supportedMaterials", "supported_materials", "plasticTypes", "plastic_types", "materials"]):
+        sync_compartments(smart_bin, load_supported_materials(payload))
     db.session.commit()
     return data_response(bin_for_owner(smart_bin))
 
@@ -86,7 +180,7 @@ def delete_bin(bin_id: str):
     ensure_bin_owner(user, smart_bin)
     smart_bin.status = "disabled"
     db.session.commit()
-    return data_response({"deleted": True})
+    return data_response({"deleted": False, "inactive": True, "message": "Smart bin was marked inactive."})
 
 
 @bp.get("/<bin_id>/compartments")

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { MaterialBadge } from '../common/MaterialBadge'
 import { Modal } from './Modal'
-import type { CollectorOffer, Dustbin, LotPlasticItem, PlasticLot, PlasticMaterial, SmartBin } from '../../types/domain'
+import type { CollectorOffer, LotPlasticItem, PlasticLot, PlasticMaterial, SmartBin } from '../../types/domain'
 import { formatCurrency, formatKg } from '../../utils/format'
 import { plasticMaterialLabel } from '../../../config/plasticMaterials'
 
@@ -10,10 +10,9 @@ interface OwnerModalsProps {
   scheduleOffer: CollectorOffer | null
   editLot: PlasticLot | null
   lots: PlasticLot[]
-  dustbins: Dustbin[]
   isPublishOpen: boolean
   onClose: () => void
-  onPublish: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[], dustbinId?: string) => void
+  onPublish: (binId: string, pricePerKg: number, pickupWindow: string, plasticItems: LotPlasticItem[]) => void
   onUpdateLot: (lotId: string, pricePerKg: number, plasticItems: LotPlasticItem[]) => void
   onSchedule: (offerId: string, pickupDate: string, timeWindow: string) => void
 }
@@ -23,7 +22,6 @@ export function OwnerModals({
   scheduleOffer,
   editLot,
   lots,
-  dustbins,
   isPublishOpen,
   onClose,
   onPublish,
@@ -35,7 +33,6 @@ export function OwnerModals({
   const [publishWeights, setPublishWeights] = useState<Record<string, string>>({})
   const [publishIncluded, setPublishIncluded] = useState<Record<string, boolean>>({})
   const [publishErrors, setPublishErrors] = useState<Record<string, string>>({})
-  const [publishDustbinId, setPublishDustbinId] = useState('')
   const [editPriceValues, setEditPriceValues] = useState<Record<string, string>>({})
   const [editWeightValues, setEditWeightValues] = useState<Record<string, string>>({})
   const [removedEditItems, setRemovedEditItems] = useState<string[]>([])
@@ -43,18 +40,12 @@ export function OwnerModals({
   const [pickupDate, setPickupDate] = useState('2026-07-18')
   const [pickupWindow, setPickupWindow] = useState('9:00 AM-11:00 AM')
 
-  const readyCompartments = useMemo(
-    () =>
-      publishBin?.compartments.filter(
-        (compartment) => compartment.status === 'ready' || compartment.fillLevel >= compartment.thresholdLevel,
-      ) ?? [],
-    [publishBin],
-  )
+  const supportedCompartments = useMemo(() => publishBin?.compartments ?? [], [publishBin])
   const scheduleLot = scheduleOffer ? lots.find((lot) => lot.id === scheduleOffer.lotId) : undefined
   const publishKey = (material: PlasticMaterial) => `${publishBin?.id ?? 'bin'}:${material}`
-  const publishTotal = readyCompartments.reduce((total, compartment) => {
+  const publishTotal = supportedCompartments.reduce((total, compartment) => {
     const key = publishKey(compartment.material)
-    if (!(publishIncluded[key] ?? true)) return total
+    if (!(publishIncluded[key] ?? false)) return total
     const value = Number(publishWeights[key])
     return total + (Number.isFinite(value) && value > 0 ? value : 0)
   }, 0)
@@ -96,8 +87,8 @@ export function OwnerModals({
   }
 
   const publishItems = () =>
-    readyCompartments
-      .filter((compartment) => publishIncluded[publishKey(compartment.material)] ?? true)
+    supportedCompartments
+      .filter((compartment) => publishIncluded[publishKey(compartment.material)] ?? false)
       .map((compartment) => ({
         plasticType: compartment.material,
         weight: Number(publishWeights[publishKey(compartment.material)]),
@@ -118,12 +109,12 @@ export function OwnerModals({
     <>
       <Modal
         title="Publish plastic lot"
-        description="Enter the seller-verified weight for each platform-detected plastic stream."
-        icon={readyCompartments[0] ? <MaterialBadge material={readyCompartments[0].material} /> : null}
+        description="Choose the supported plastic streams you want to publish and enter each weight manually."
+        icon={supportedCompartments[0] ? <MaterialBadge material={supportedCompartments[0].material} /> : null}
         isOpen={isPublishOpen}
         onClose={onClose}
       >
-        {publishBin && readyCompartments.length > 0 ? (
+        {publishBin && supportedCompartments.length > 0 ? (
           <form
             onSubmit={(event) => {
               event.preventDefault()
@@ -140,7 +131,6 @@ export function OwnerModals({
                   weight: item.weight,
                   weightUnit: item.weightUnit,
                 })),
-                publishDustbinId || undefined,
               )
             }}
           >
@@ -155,11 +145,11 @@ export function OwnerModals({
               </div>
             </div>
             <div className="plastic-editor">
-              {readyCompartments.map((compartment) => (
+              {supportedCompartments.map((compartment) => (
                 <div className="plastic-row" key={compartment.id}>
                   <label className="check-line">
                     <input
-                      checked={publishIncluded[publishKey(compartment.material)] ?? true}
+                      checked={publishIncluded[publishKey(compartment.material)] ?? false}
                       type="checkbox"
                       onChange={(event) =>
                         setPublishIncluded({ ...publishIncluded, [publishKey(compartment.material)]: event.target.checked })
@@ -171,12 +161,12 @@ export function OwnerModals({
                   <label className="field compact-field">
                     <span>Weight</span>
                     <input
-                      disabled={!(publishIncluded[publishKey(compartment.material)] ?? true)}
+                      disabled={!(publishIncluded[publishKey(compartment.material)] ?? false)}
                       min="0.01"
                       step="0.01"
                       inputMode="decimal"
                       placeholder="kg"
-                      required={publishIncluded[publishKey(compartment.material)] ?? true}
+                      required={publishIncluded[publishKey(compartment.material)] ?? false}
                       type="number"
                       value={publishWeights[publishKey(compartment.material)] ?? ''}
                       onChange={(event) =>
@@ -189,19 +179,6 @@ export function OwnerModals({
               ))}
               {publishErrors.form ? <small className="field-error">{publishErrors.form}</small> : null}
             </div>
-            <label className="field">
-              <span>Registered dustbin</span>
-              <select value={publishDustbinId} onChange={(event) => setPublishDustbinId(event.target.value)}>
-                <option value="">No registered dustbin</option>
-                {dustbins
-                  .filter((dustbin) => dustbin.isActive)
-                  .map((dustbin) => (
-                    <option key={dustbin.id} value={dustbin.id}>
-                      {dustbin.name} - {dustbin.code}
-                    </option>
-                  ))}
-              </select>
-            </label>
             <label className="field">
               <span>Minimum price per kilogram</span>
               <input min="1" required type="number" value={price} onChange={(event) => setPrice(event.target.value)} />
@@ -219,7 +196,7 @@ export function OwnerModals({
             </button>
           </form>
         ) : (
-          <p>No ready compartment is available in the selected bin.</p>
+          <p>Add at least one supported plastic type to this smart bin before publishing a lot.</p>
         )}
       </Modal>
       <Modal

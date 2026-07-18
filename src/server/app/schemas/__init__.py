@@ -50,28 +50,6 @@ class CollectionPointSchema(BaseSchema):
     contact_phone = fields.String(load_default="")
 
 
-class DustbinSchema(BaseSchema):
-    name = fields.String(required=True, validate=validate.Length(min=2, max=120))
-    code = fields.String(required=True, validate=validate.Length(min=2, max=80))
-    location_address = fields.String(load_default=None, allow_none=True, validate=validate.Length(max=255))
-    locationAddress = fields.String(data_key="locationAddress", load_default=None, allow_none=True, validate=validate.Length(max=255))
-    location = fields.String(load_default=None, allow_none=True, validate=validate.Length(max=255))
-    latitude = fields.Decimal(required=True, as_string=False, validate=validate.Range(min=-90, max=90))
-    longitude = fields.Decimal(required=True, as_string=False, validate=validate.Range(min=-180, max=180))
-    supported_plastic_type = fields.String(load_default=None, allow_none=True, validate=validate.Length(max=32))
-    supportedPlasticType = fields.String(data_key="supportedPlasticType", load_default=None, allow_none=True, validate=validate.Length(max=32))
-    description = fields.String(load_default="", allow_none=True, validate=validate.Length(max=1000))
-    is_active = fields.Boolean(load_default=True)
-    isActive = fields.Boolean(data_key="isActive", load_default=None, allow_none=True)
-
-    @validates_schema
-    def require_location_and_material(self, data, **_kwargs):
-        if not (data.get("location_address") or data.get("locationAddress") or data.get("location")):
-            raise ValidationError({"locationAddress": ["Location or address is required."]})
-        if not (data.get("supported_plastic_type") or data.get("supportedPlasticType")):
-            raise ValidationError({"supportedPlasticType": ["Supported plastic type is required."]})
-
-
 class LatLngSchema(BaseSchema):
     lat = fields.Decimal(required=True, as_string=False, validate=validate.Range(min=-90, max=90))
     lng = fields.Decimal(required=True, as_string=False, validate=validate.Range(min=-180, max=180))
@@ -109,8 +87,6 @@ class PublishLotSchema(BaseSchema):
     compartmentId = fields.String(data_key="compartmentId", load_default=None, allow_none=True)
     compartment_id = fields.String(load_default=None, allow_none=True)
     collection_point_id = fields.String(load_default=None, allow_none=True)
-    dustbinId = fields.String(data_key="dustbinId", load_default=None, allow_none=True)
-    dustbin_id = fields.String(load_default=None, allow_none=True)
     material = fields.String(load_default=None, allow_none=True)
     material_id = fields.String(load_default=None, allow_none=True)
     quantity_kg = fields.Decimal(load_default=None, as_string=False, validate=validate.Range(min=0), allow_none=True)

@@ -1084,6 +1084,7 @@ a {
 }
 
 .status.offline,
+.status.inactive,
 .status.withdrawn,
 .status.rejected {
   background: var(--coral-light);
@@ -1129,7 +1130,8 @@ a {
   box-shadow: 0 0 0 4px var(--sun-light);
 }
 
-.health.offline {
+.health.offline,
+.health.inactive {
   background: var(--coral);
   box-shadow: 0 0 0 4px var(--coral-light);
 }
@@ -1460,6 +1462,11 @@ a {
   color: #ffffff;
 }
 
+.mini-btn.danger {
+  border-color: var(--coral-light);
+  color: #a64a42;
+}
+
 .lot-footnote {
   display: flex;
   gap: 10px;
@@ -1601,16 +1608,16 @@ a {
   gap: 10px;
 }
 
-.dustbin-list {
+.smart-bin-list {
   display: grid;
   gap: 10px;
 }
 
-.dustbin-list.compact {
+.smart-bin-list.compact {
   gap: 8px;
 }
 
-.dustbin-card {
+.smart-bin-card {
   display: grid;
   width: 100%;
   grid-template-columns: 42px 1fr auto;
@@ -1624,33 +1631,57 @@ a {
   text-align: left;
 }
 
-.dustbin-card.active,
-.dustbin-card:hover {
+.smart-bin-card.active,
+.smart-bin-card:hover {
   border-color: var(--mint);
   background: var(--mint-light);
 }
 
-.dustbin-card strong,
-.dustbin-card small {
+.smart-bin-card strong,
+.smart-bin-card small {
   display: block;
 }
 
-.dustbin-card strong {
+.smart-bin-card strong {
   font-size: 10px;
 }
 
-.dustbin-card small {
+.smart-bin-card small {
   margin-top: 3px;
   color: var(--ink-soft);
   font-size: 8px;
 }
 
-.dustbin-card .status {
+.smart-bin-card .status {
   margin-top: 0;
 }
 
-.dustbin-form-panel {
+.smart-bin-form-panel {
   margin-top: 17px;
+}
+
+.checkbox-grid {
+  padding: 0;
+  border: 0;
+}
+
+.checkbox-grid legend {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.checkbox-grid .check-line {
+  display: inline-flex;
+  width: calc(50% - 6px);
+  margin: 0 12px 8px 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-grid input {
+  width: auto;
 }
 
 .demand {
@@ -2639,7 +2670,7 @@ td small {
   .partner,
   .demand,
   .material-row,
-  .dustbin-card,
+  .smart-bin-card,
   .plastic-row {
     grid-template-columns: 40px 1fr;
   }
@@ -2648,7 +2679,7 @@ td small {
   .request-price,
   .score,
   .match,
-  .dustbin-card .status {
+  .smart-bin-card .status {
     grid-column: 2;
     text-align: left;
   }

@@ -1,6 +1,6 @@
 # PolyLoop Flask API
 
-Shared Flask backend for the collector and dustbin-owner React apps.
+Shared Flask backend for the collector and smart-bin owner React apps.
 
 ## Setup
 
