@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from app.services.seed_data import DEMO_PASSWORD
 
-
-def test_register_login_refresh_and_protected_endpoint(client, auth_header):
+def test_register_login_and_protected_endpoint(client, auth_header):
+    token = "new.collector@example.test"
     response = client.post(
         "/api/v1/auth/register",
+        headers=auth_header(token),
         json={
-            "email": "new.collector@example.test",
-            "password": "StrongPass123!",
             "first_name": "New",
             "last_name": "Collector",
             "role": "collector",
@@ -17,25 +15,21 @@ def test_register_login_refresh_and_protected_endpoint(client, auth_header):
     )
     assert response.status_code == 201
     assert response.get_json()["data"]["user"]["role"] == "collector"
+    assert "accessToken" not in response.get_json()["data"]
 
-    login = client.post("/api/v1/auth/login", json={"email": "new.collector@example.test", "password": "StrongPass123!"})
+    login = client.post("/api/v1/auth/login", headers=auth_header(token), json={})
     assert login.status_code == 200
-    refresh_token = login.get_json()["data"]["refreshToken"]
-
-    refreshed = client.post("/api/v1/auth/refresh", headers=auth_header(refresh_token))
-    assert refreshed.status_code == 200
-    assert refreshed.get_json()["data"]["accessToken"]
 
     protected = client.get("/api/v1/users/me")
     assert protected.status_code == 401
 
 
 def test_register_owner_and_invalid_password(client):
+    token = "new.owner@example.test"
     response = client.post(
         "/api/v1/auth/register",
+        headers={"Authorization": f"Bearer {token}"},
         json={
-            "email": "new.owner@example.test",
-            "password": "StrongPass123!",
             "first_name": "New",
             "last_name": "Owner",
             "role": "owner",
@@ -44,8 +38,8 @@ def test_register_owner_and_invalid_password(client):
     assert response.status_code == 201
     assert response.get_json()["data"]["user"]["role"] == "owner"
 
-    invalid = client.post("/api/v1/auth/login", json={"email": "owner@polyloop.demo", "password": "wrong"})
-    assert invalid.status_code == 403
+    invalid = client.post("/api/v1/auth/login", json={})
+    assert invalid.status_code == 401
 
 
 def test_role_restriction(client, collector_token, auth_header):
@@ -53,10 +47,17 @@ def test_role_restriction(client, collector_token, auth_header):
     assert response.status_code == 403
 
 
-def test_change_password(client, owner_token, auth_header):
+def test_first_google_login_can_create_profile(client, auth_header):
+    token = "google.owner@example.test"
     response = client.post(
-        "/api/v1/auth/change-password",
-        headers=auth_header(owner_token),
-        json={"current_password": DEMO_PASSWORD, "new_password": "UpdatedPass123!"},
+        "/api/v1/auth/login",
+        headers=auth_header(token),
+        json={
+            "first_name": "Google",
+            "last_name": "Owner",
+            "role": "owner",
+            "organization_name": "Google Owner Co",
+        },
     )
     assert response.status_code == 200
+    assert response.get_json()["data"]["user"]["firebaseUid"] == f"test-{token}"

@@ -48,6 +48,9 @@ class BaseConfig:
     JSON_SORT_KEYS = False
     MAX_PAGE_SIZE = 100
     GOOGLE_MAPS_SERVER_API_KEY = os.getenv("GOOGLE_MAPS_SERVER_API_KEY", "")
+    FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+    FIREBASE_CREDENTIALS_FILE = os.getenv("FIREBASE_CREDENTIALS_FILE", "")
+    FIREBASE_CREDENTIALS_JSON = os.getenv("FIREBASE_CREDENTIALS_JSON", "")
 
 
 class DevelopmentConfig(BaseConfig):

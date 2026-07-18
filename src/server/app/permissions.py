@@ -2,18 +2,26 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
-
-from app.errors import PermissionDenied, ResourceNotFound
+from app.errors import ApiError, PermissionDenied, ResourceNotFound
 from app.extensions import db
+from app.firebase_auth import verify_firebase_token
 from app.models import User
 
 
 def current_user() -> User:
-    verify_jwt_in_request()
-    user = db.session.get(User, get_jwt_identity())
+    decoded = verify_firebase_token()
+    uid = decoded.get("uid")
+    email = (decoded.get("email") or "").lower()
+    user = User.query.filter_by(firebase_uid=uid).first() if uid else None
+    if user is None and email:
+        user = User.query.filter_by(email=email).first()
+        if user and uid:
+            if user.firebase_uid and user.firebase_uid != uid:
+                raise ApiError("account_identity_mismatch", "This email is linked to a different Firebase account.", 403)
+            user.firebase_uid = uid
+            db.session.flush()
     if not user or not user.is_active:
-        raise PermissionDenied("Authentication is required.")
+        raise ApiError("account_not_registered", "This Firebase account is not registered in Zytron.", 403)
     return user
 
 

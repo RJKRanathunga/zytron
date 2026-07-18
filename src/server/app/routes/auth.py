@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from flask import Blueprint
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt, get_jwt_identity, jwt_required
-from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
-from app.models import Organization, RevokedToken, User
+from app.firebase_auth import verify_firebase_token
+from app.models import Organization, User
 from app.models.base import new_id
 from app.routes.helpers import data_response, load_payload
-from app.schemas import ChangePasswordSchema, LoginSchema, RegisterSchema
+from app.schemas import LoginSchema, RegisterSchema
 from app.services.workflows import snapshot_for
 from app.errors import ApiError, PermissionDenied
 
@@ -21,6 +20,7 @@ def auth_user(user: User) -> dict:
         "id": user.id,
         "email": user.email,
         "role": user.role,
+        "firebaseUid": user.firebase_uid,
         "name": org_name,
         "firstName": user.first_name,
         "lastName": user.last_name,
@@ -28,98 +28,112 @@ def auth_user(user: User) -> dict:
     }
 
 
-def token_payload(user: User) -> dict:
-    access_token = create_access_token(identity=user.id, additional_claims={"role": user.role})
-    refresh_token = create_refresh_token(identity=user.id, additional_claims={"role": user.role})
+def auth_payload(user: User) -> dict:
     return {
-        "accessToken": access_token,
-        "refreshToken": refresh_token,
         "user": auth_user(user),
         "snapshot": snapshot_for(user) if user.role in {"collector", "owner"} else None,
     }
 
 
-@bp.post("/register")
-def register():
-    payload = load_payload(RegisterSchema())
-    email = payload["email"].lower()
-    if User.query.filter_by(email=email).first():
-        raise ApiError("email_already_registered", "An account with this email already exists.", 409)
+def firebase_identity() -> tuple[str, str]:
+    decoded = verify_firebase_token()
+    uid = decoded.get("uid")
+    email = (decoded.get("email") or "").lower()
+    if not uid or not email:
+        raise ApiError("invalid_firebase_profile", "Firebase did not return a verified user email.", 401)
+    return uid, email
 
+
+def find_user(uid: str, email: str) -> User | None:
+    user = User.query.filter_by(firebase_uid=uid).first()
+    if user:
+        return user
+    user = User.query.filter_by(email=email).first()
+    if user:
+        if not user.firebase_uid:
+            user.firebase_uid = uid
+        db.session.flush()
+    return user
+
+
+def create_user(uid: str, email: str, payload: dict) -> User:
+    role = payload["role"]
     org_name = payload.get("organization_name") or f"{payload['first_name']} {payload['last_name']}"
     organization = Organization(
         id=new_id("org"),
         name=org_name,
-        organization_type=payload["role"],
+        organization_type=role,
         email=email,
         phone=payload.get("phone") or "",
     )
     user = User(
         id=new_id("usr"),
         email=email,
-        password_hash=generate_password_hash(payload["password"]),
+        firebase_uid=uid,
+        password_hash=None,
         first_name=payload["first_name"],
         last_name=payload["last_name"],
         phone=payload.get("phone") or "",
-        role=payload["role"],
+        role=role,
         organization=organization,
         is_active=True,
         is_verified=True,
-        vehicle_capacity_kg=100 if payload["role"] == "collector" else 0,
+        vehicle_capacity_kg=100 if role == "collector" else 0,
     )
     db.session.add_all([organization, user])
+    return user
+
+
+@bp.post("/register")
+def register():
+    payload = load_payload(RegisterSchema())
+    uid, email = firebase_identity()
+    user = find_user(uid, email)
+    if user and user.firebase_uid != uid:
+        raise ApiError("email_already_registered", "An account with this email already exists.", 409)
+    if user is None:
+        user = create_user(uid, email, payload)
+    elif user.role != payload["role"]:
+        raise PermissionDenied(f"Please sign in with your existing {user.role} account.")
+    if not user.is_active:
+        raise PermissionDenied("This account is inactive.")
+    user.touch_login()
     db.session.commit()
-    return data_response(token_payload(user), 201)
+    return data_response(auth_payload(user), 201)
 
 
 @bp.post("/login")
 def login():
     payload = load_payload(LoginSchema())
-    user = User.query.filter_by(email=payload["email"].lower()).first()
-    if not user or not check_password_hash(user.password_hash, payload["password"]):
-        raise PermissionDenied("Invalid email or password.")
+    uid, email = firebase_identity()
+    user = find_user(uid, email)
+    if user and user.firebase_uid != uid:
+        raise ApiError("account_identity_mismatch", "This email is linked to a different Firebase account.", 403)
+    if user is None:
+        if not payload.get("role") or not payload.get("first_name") or not payload.get("last_name"):
+            raise ApiError(
+                "account_setup_required",
+                "Choose a role and create your Zytron profile before continuing.",
+                403,
+            )
+        user = create_user(uid, email, payload)
     if not user.is_active:
         raise PermissionDenied("This account is inactive.")
     user.touch_login()
     db.session.commit()
-    return data_response(token_payload(user))
-
-
-@bp.post("/refresh")
-@jwt_required(refresh=True)
-def refresh():
-    user = db.session.get(User, get_jwt_identity())
-    if not user or not user.is_active:
-        raise PermissionDenied("Authentication is required.")
-    return data_response({"accessToken": create_access_token(identity=user.id, additional_claims={"role": user.role})})
+    return data_response(auth_payload(user))
 
 
 @bp.post("/logout")
-@jwt_required(verify_type=False)
 def logout():
-    token = get_jwt()
-    revoked = RevokedToken(jti=token["jti"], token_type=token.get("type", "access"), user_id=get_jwt_identity())
-    db.session.merge(revoked)
-    db.session.commit()
-    return data_response({"revoked": True})
+    return data_response({"signedOut": True})
 
 
 @bp.get("/me")
-@jwt_required()
 def me():
-    user = db.session.get(User, get_jwt_identity())
+    uid, email = firebase_identity()
+    user = find_user(uid, email)
     if not user or not user.is_active:
         raise PermissionDenied("Authentication is required.")
-    return data_response({"user": auth_user(user), "snapshot": snapshot_for(user) if user.role in {"collector", "owner"} else None})
-
-
-@bp.post("/change-password")
-@jwt_required()
-def change_password():
-    payload = load_payload(ChangePasswordSchema())
-    user = db.session.get(User, get_jwt_identity())
-    if not user or not check_password_hash(user.password_hash, payload["current_password"]):
-        raise PermissionDenied("Current password is incorrect.")
-    user.password_hash = generate_password_hash(payload["new_password"])
     db.session.commit()
-    return data_response({"changed": True})
+    return data_response({"user": auth_user(user), "snapshot": snapshot_for(user) if user.role in {"collector", "owner"} else None})

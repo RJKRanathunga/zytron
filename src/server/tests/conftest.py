@@ -12,6 +12,11 @@ class TestConfig(TestingConfig):
     JWT_SECRET_KEY = "test-jwt-secret-change-me-please-32-bytes"
     SECRET_KEY = "test-secret-change-me-please-32-bytes"
 
+    @staticmethod
+    def FIREBASE_TOKEN_VERIFIER(token: str):
+        email = token.lower()
+        return {"uid": f"test-{email}", "email": email}
+
 
 @pytest.fixture()
 def app():
@@ -30,9 +35,10 @@ def client(app):
 
 
 def login(client, email: str, password: str = DEMO_PASSWORD) -> str:
-    response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    del password
+    response = client.post("/api/v1/auth/login", headers={"Authorization": f"Bearer {email}"}, json={})
     assert response.status_code == 200, response.get_json()
-    return response.get_json()["data"]["accessToken"]
+    return email
 
 
 @pytest.fixture()

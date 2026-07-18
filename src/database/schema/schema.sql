@@ -19,7 +19,8 @@ CREATE TABLE organizations (
 CREATE TABLE users (
   id VARCHAR(64) PRIMARY KEY,
   email VARCHAR(160) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
+  firebase_uid VARCHAR(128) UNIQUE,
+  password_hash VARCHAR(255),
   first_name VARCHAR(80) NOT NULL,
   last_name VARCHAR(80) NOT NULL,
   phone VARCHAR(40),
@@ -321,6 +322,7 @@ CREATE TABLE revoked_tokens (
 );
 
 CREATE INDEX ix_users_role ON users(role);
+CREATE UNIQUE INDEX ix_users_firebase_uid ON users(firebase_uid);
 CREATE INDEX ix_collection_points_owner_id ON collection_points(owner_id);
 CREATE INDEX ix_collection_points_district ON collection_points(district);
 CREATE INDEX ix_smart_bins_collection_point_id ON smart_bins(collection_point_id);

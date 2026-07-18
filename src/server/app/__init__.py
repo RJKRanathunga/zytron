@@ -8,6 +8,7 @@ from app.commands import register_commands
 from app.config import get_config
 from app.errors import register_error_handlers
 from app.extensions import cors, db, jwt, ma, migrate
+from app.firebase_auth import init_firebase_admin
 from app.routes import register_blueprints
 
 
@@ -21,6 +22,7 @@ def create_app(config_object=None):
     jwt.init_app(app)
     ma.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
+    init_firebase_admin(app)
 
     from app import models  # noqa: F401
     from app.models import RevokedToken

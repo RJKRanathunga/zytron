@@ -2,33 +2,33 @@ from __future__ import annotations
 
 
 def test_owner_cannot_edit_another_owner_bin(client, auth_header):
+    token = "other.owner@example.test"
     registered = client.post(
         "/api/v1/auth/register",
+        headers=auth_header(token),
         json={
-            "email": "other.owner@example.test",
-            "password": "StrongPass123!",
             "first_name": "Other",
             "last_name": "Owner",
             "role": "owner",
         },
     )
-    token = registered.get_json()["data"]["accessToken"]
+    assert registered.status_code == 201
     response = client.patch("/api/v1/bins/bin-a-03", headers=auth_header(token), json={"name": "Nope"})
     assert response.status_code == 404
 
 
 def test_owner_cannot_accept_offer_on_another_owner_lot(client, auth_header):
+    token = "separate.owner@example.test"
     registered = client.post(
         "/api/v1/auth/register",
+        headers=auth_header(token),
         json={
-            "email": "separate.owner@example.test",
-            "password": "StrongPass123!",
             "first_name": "Separate",
             "last_name": "Owner",
             "role": "owner",
         },
     )
-    token = registered.get_json()["data"]["accessToken"]
+    assert registered.status_code == 201
     response = client.post("/api/v1/offers/offer-greennova/accept", headers=auth_header(token), json={})
     assert response.status_code == 404
 

@@ -1947,6 +1947,50 @@ a {
   outline: 0;
 }
 
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #eef5f0;
+}
+
+.auth-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.auth-tabs button.active {
+  background: #ffffff;
+  box-shadow: 0 4px 11px rgba(17, 61, 52, 0.08);
+  color: var(--ink);
+}
+
+.form-grid.compact {
+  grid-template-columns: 1fr 1fr;
+}
+
+.form-success {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #08755b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.auth-foot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .toast {
   position: fixed;
   right: 25px;

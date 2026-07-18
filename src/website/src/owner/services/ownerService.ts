@@ -1,26 +1,9 @@
-import {
-  ApiClientError,
-  API_BASE_URL,
-  apiRequest,
-  clearAuthTokens,
-  getAuthTokens,
-  setAuthTokens,
-  type AuthTokens,
-} from '../../services/apiClient'
+import { apiRequest } from '../../services/apiClient'
+import { authService } from '../../auth/authService'
 import type { OwnerSnapshot } from '../types/domain'
-
-interface AuthResponse extends AuthTokens {
-  user: {
-    role: string
-  }
-  snapshot?: OwnerSnapshot
-}
 
 export interface OwnerService {
   hasSession: () => boolean
-  login: (email: string, password: string) => Promise<OwnerSnapshot>
-  loginDemo: () => Promise<OwnerSnapshot>
-  register: (input: RegisterInput) => Promise<OwnerSnapshot>
   logout: () => Promise<void>
   loadSnapshot: () => Promise<OwnerSnapshot>
   publishLot: (binId: string, pricePerKg: number, pickupWindow: string) => Promise<OwnerSnapshot>
@@ -45,58 +28,14 @@ export interface OwnerProfileUpdate {
   phone: string
 }
 
-function requireOwner(response: AuthResponse): OwnerSnapshot {
-  if (response.user.role !== 'owner' || !response.snapshot) {
-    clearAuthTokens()
-    throw new ApiClientError('Please sign in with an owner account.', 403, 'wrong_role')
-  }
-  setAuthTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken })
-  return response.snapshot
-}
-
 async function reloadSnapshot(): Promise<OwnerSnapshot> {
   return apiRequest<OwnerSnapshot>('/dashboard/owner')
 }
 
 export const ownerService: OwnerService = {
-  hasSession: () => Boolean(getAuthTokens()),
+  hasSession: authService.hasSession,
 
-  login: async (email, password) => {
-    const response = await apiRequest<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    })
-    return requireOwner(response)
-  },
-
-  loginDemo: () => ownerService.login('owner@polyloop.demo', 'PolyLoop123!'),
-
-  register: async (input) => {
-    const response = await apiRequest<AuthResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: input.email,
-        password: input.password,
-        first_name: input.firstName,
-        last_name: input.lastName,
-        organization_name: input.organizationName,
-        role: 'owner',
-      }),
-    })
-    return requireOwner(response)
-  },
-
-  logout: async () => {
-    const tokens = getAuthTokens()
-    if (tokens) {
-      await apiRequest('/auth/logout', { method: 'POST' }).catch(() => undefined)
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${tokens.refreshToken}` },
-      }).catch(() => undefined)
-    }
-    clearAuthTokens()
-  },
+  logout: authService.logout,
 
   loadSnapshot: reloadSnapshot,
 

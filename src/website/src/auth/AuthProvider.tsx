@@ -3,10 +3,12 @@ import { authService } from './authService'
 import { AuthContext } from './AuthContext'
 import { AUTH_CLEARED_EVENT } from '../services/apiClient'
 import type { AuthUser } from '../types/auth'
+import type { RegisterInput } from './AuthContext'
+import type { UserRole } from '../types/auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setLoading] = useState(() => authService.hasSession())
+  const [isLoading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const reloadUser = useCallback(async () => {
@@ -31,10 +33,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => void reloadUser(), 0)
-    return () => window.clearTimeout(timer)
-  }, [reloadUser])
+  useEffect(
+    () =>
+      authService.onFirebaseAuthStateChanged((firebaseUser) => {
+        if (firebaseUser) {
+          void reloadUser()
+        } else {
+          setUser(null)
+          setLoading(false)
+        }
+      }),
+    [reloadUser],
+  )
 
   useEffect(() => {
     const handleAuthCleared = () => setUser(null)
@@ -49,14 +59,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authenticatedUser
   }, [])
 
+  const loginWithGoogle = useCallback(async (role?: UserRole) => {
+    setError('')
+    const authenticatedUser = await authService.loginWithGoogle({ role })
+    setUser(authenticatedUser)
+    return authenticatedUser
+  }, [])
+
+  const register = useCallback(async (input: RegisterInput) => {
+    setError('')
+    const authenticatedUser = await authService.register(input)
+    setUser(authenticatedUser)
+    return authenticatedUser
+  }, [])
+
+  const resetPassword = useCallback(async (email: string) => {
+    setError('')
+    await authService.resetPassword(email)
+  }, [])
+
   const logout = useCallback(async () => {
     await authService.logout()
     setUser(null)
   }, [])
 
   const value = useMemo(
-    () => ({ user, isLoading, error, login, logout, reloadUser }),
-    [user, isLoading, error, login, logout, reloadUser],
+    () => ({ user, isLoading, error, login, loginWithGoogle, register, resetPassword, logout, reloadUser }),
+    [user, isLoading, error, login, loginWithGoogle, register, resetPassword, logout, reloadUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

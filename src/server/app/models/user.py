@@ -25,7 +25,8 @@ class User(TimestampMixin, db.Model):
 
     id = db.Column(db.String(64), primary_key=True, default=lambda: new_id("usr"))
     email = db.Column(db.String(160), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    firebase_uid = db.Column(db.String(128), unique=True, index=True)
+    password_hash = db.Column(db.String(255))
     first_name = db.Column(db.String(80), nullable=False)
     last_name = db.Column(db.String(80), nullable=False)
     phone = db.Column(db.String(40))

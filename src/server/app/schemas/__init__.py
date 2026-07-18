@@ -9,8 +9,6 @@ class BaseSchema(Schema):
 
 
 class RegisterSchema(BaseSchema):
-    email = fields.Email(required=True)
-    password = fields.String(required=True, validate=validate.Length(min=8, max=128))
     first_name = fields.String(required=True, validate=validate.Length(min=1, max=80))
     last_name = fields.String(required=True, validate=validate.Length(min=1, max=80))
     role = fields.String(required=True, validate=validate.OneOf(["collector", "owner"]))
@@ -19,8 +17,11 @@ class RegisterSchema(BaseSchema):
 
 
 class LoginSchema(BaseSchema):
-    email = fields.Email(required=True)
-    password = fields.String(required=True, validate=validate.Length(min=1, max=128))
+    first_name = fields.String(validate=validate.Length(min=1, max=80))
+    last_name = fields.String(validate=validate.Length(min=1, max=80))
+    role = fields.String(validate=validate.OneOf(["collector", "owner"]))
+    phone = fields.String(load_default="")
+    organization_name = fields.String(load_default="")
 
 
 class ChangePasswordSchema(BaseSchema):
